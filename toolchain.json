@@ -1,0 +1,10 @@
+{
+  "status": "planned-build-baseline-not-yet-exercised",
+  "xcode_version": "26.0.1",
+  "xcode_build": "17A400",
+  "iphoneos_sdk": "26.0",
+  "minimum_sdk_major": 26,
+  "deployment_target": "26.0",
+  "swift_language_mode": "6",
+  "bundle_identifier": "com.infinityball.seatweave"
+}

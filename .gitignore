@@ -1,0 +1,24 @@
+# macOS and Xcode local state
+.DS_Store
+DerivedData/
+build/
+.build/
+xcuserdata/
+*.xcuserstate
+*.xcresult
+artifacts/
+coverage/
+# Local guest data and generated exports, never synthetic tracked fixtures
+local-data/
+exports/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+# Signing/auth material
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.mobileprovision
+# Shared Xcode project/workspace, Package.resolved and test fixtures stay tracked
