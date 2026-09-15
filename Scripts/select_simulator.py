@@ -31,6 +31,7 @@ def select_destination(payload: dict, sdk_version: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sdk", required=True)
+    parser.add_argument("--devices-json-out", type=argparse.FileType("w", encoding="utf-8"))
     args = parser.parse_args()
     try:
         output = subprocess.run(
@@ -38,9 +39,17 @@ def main() -> int:
             check=True,
             text=True,
             stdout=subprocess.PIPE,
+            timeout=30,
         ).stdout
+        if args.devices_json_out:
+            args.devices_json_out.write(output)
         udid = select_destination(json.loads(output), args.sdk)
-    except (subprocess.CalledProcessError, json.JSONDecodeError, DestinationError) as error:
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+        DestinationError,
+    ) as error:
         print(error, file=sys.stderr)
         return 1
     print(udid)

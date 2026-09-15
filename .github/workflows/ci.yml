@@ -27,6 +27,7 @@ jobs:
           persist-credentials: false
 
       - name: Run pinned simulator validation
+        timeout-minutes: 38
         run: Scripts/ci.sh "$TARGET_SHA"
 
       - name: Upload results and provenance

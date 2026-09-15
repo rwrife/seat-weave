@@ -14,6 +14,7 @@ artifact_root="${SEATWEAVE_ARTIFACT_DIR:-$repo_root/build/ci-artifacts}"
 mkdir -p "$artifact_root" "$repo_root/build"
 artifact_dir="$(mktemp -d "$artifact_root/run.XXXXXX")"
 derived_data="$(mktemp -d "$repo_root/build/DerivedData.XXXXXX")"
+phase="initialization"
 
 write_provenance() {
   local result=$?
@@ -24,12 +25,19 @@ write_provenance() {
     echo "runner_arch=${RUNNER_ARCH:-unknown}"
     echo "developer_dir=${DEVELOPER_DIR:-unselected}"
     echo "simulator_udid=${simulator_udid:-unselected}"
+    echo "phase=$phase"
     echo "exit_status=$result"
   } > "$artifact_dir/provenance.txt"
   if [[ -n "${DEVELOPER_DIR:-}" ]]; then
-    xcodebuild -version > "$artifact_dir/xcode-version.txt" 2>&1 || true
-    xcrun --sdk iphoneos --show-sdk-version > "$artifact_dir/iphoneos-sdk-version.txt" 2>&1 || true
-    xcrun simctl list devices available --json > "$artifact_dir/simulator-devices.json" 2>&1 || true
+    python3 Scripts/boot_simulator.py capture \
+      --timeout 15 --output "$artifact_dir/xcode-version.txt" \
+      -- xcodebuild -version || true
+    python3 Scripts/boot_simulator.py capture \
+      --timeout 15 --output "$artifact_dir/iphoneos-sdk-version.txt" \
+      -- xcrun --sdk iphoneos --show-sdk-version || true
+    python3 Scripts/boot_simulator.py capture \
+      --timeout 20 --output "$artifact_dir/simulator-devices-exit.log" \
+      -- xcrun simctl list devices available --json || true
   fi
 }
 trap write_provenance EXIT
@@ -40,8 +48,10 @@ if [[ "$actual_sha" != "$expected_sha" ]]; then
   exit 1
 fi
 
+phase="helper_tests"
 python3 -m unittest discover -s Scripts/tests -v 2>&1 | tee "$artifact_dir/helper-tests.log"
 
+phase="toolchain_selection"
 python3 Scripts/select_xcode.py \
   --toolchain toolchain.json \
   > "$artifact_dir/developer-dir.txt" \
@@ -49,18 +59,28 @@ python3 Scripts/select_xcode.py \
 export DEVELOPER_DIR
 DEVELOPER_DIR="$(<"$artifact_dir/developer-dir.txt")"
 
+phase="simulator_selection"
 sdk_version="$(python3 -c 'import json; print(json.load(open("toolchain.json", encoding="utf-8"))["iphoneos_sdk"])')"
-xcrun simctl list devices available --json > "$artifact_dir/simulator-devices.json"
-simulator_udid="$(python3 Scripts/select_simulator.py --sdk "$sdk_version")"
+simulator_udid="$(python3 Scripts/select_simulator.py \
+  --sdk "$sdk_version" \
+  --devices-json-out "$artifact_dir/simulator-devices.json")"
 echo "platform=iOS Simulator,id=$simulator_udid" > "$artifact_dir/destination.txt"
 
-xcrun simctl boot "$simulator_udid" 2>&1 | tee "$artifact_dir/simulator-boot.log" || true
-xcrun simctl bootstatus "$simulator_udid" -b 2>&1 | tee -a "$artifact_dir/simulator-boot.log"
+phase="simulator_boot"
+python3 Scripts/boot_simulator.py boot \
+  --udid "$simulator_udid" \
+  --devices-json "$artifact_dir/simulator-devices.json" \
+  --log "$artifact_dir/simulator-boot.log" \
+  --boot-timeout 120 \
+  --bootstatus-timeout 180 \
+  2> >(tee -a "$artifact_dir/simulator-boot.log" >&2)
 
+phase="domain_tests"
 xcrun swift test \
   --package-path Packages/SeatingDomain \
   2>&1 | tee "$artifact_dir/domain-tests.log"
 
+phase="app_build"
 xcodebuild build \
   -project SeatWeave.xcodeproj \
   -scheme SeatWeave \
@@ -72,6 +92,7 @@ xcodebuild build \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-build.log"
 
+phase="ui_tests"
 xcodebuild test \
   -project SeatWeave.xcodeproj \
   -scheme SeatWeave \
@@ -82,3 +103,5 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-test.log"
+
+phase="complete"
