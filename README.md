@@ -6,7 +6,7 @@ Local-first iPhone seating planner for small gatherings: arrange guests beside a
 
 Hosts of dinner parties, family celebrations and small hobby meetups often juggle a guest list and a sketch while moving people between tables. Seat Weave keeps both views connected, explains conflicting preferences, and preserves alternatives without turning a small gathering into wedding-management software.
 
-**Status: documentation/backlog scaffold only.** No application, Xcode project, CI suite, simulator run, signed binary or TestFlight release exists yet. The seven linked milestones in [PLAN.md](PLAN.md) define implementation acceptance, not completed features.
+**Status: issue #1 native bootstrap implemented; pinned macOS CI evidence pending its first run.** The repository contains a native SwiftUI app, a linked pure Swift domain package, baseline tests and a launch smoke test. Event creation and seating are intentionally not implemented yet. No local iOS build/simulator, physical-device, signed binary, TestFlight or App Store release result is claimed. The remaining milestones in [PLAN.md](PLAN.md) define future acceptance.
 
 ## Intended end-to-end workflow
 
@@ -51,14 +51,25 @@ VoiceOver labels identify guest, table, seat, assignment and warnings; reading o
 
 ## Development quickstart
 
-This commit contains planning files only; there is no build command to run yet.
+Clone the repository, then run the host-independent helper tests on macOS or Linux:
 
 ```sh
 gh repo clone rwrife/seat-weave
 cd seat-weave
+python3 -m unittest discover -s Scripts/tests -v
 ```
 
-Read PLAN.md and select the first unblocked issue. Issue #1 will add the actual Xcode project/shared scheme, repeatable `xcodebuild` commands, simulator tests and macOS CI. On a Mac, verify `xcodebuild -version` reports the exact pin and `xcrun --sdk iphoneos --show-sdk-version` reports 26.0. Linux can inspect docs but cannot establish an iOS build result. A missing pinned Xcode is an environment blocker, never permission to invent a green build.
+On a Mac with an available iPhone simulator and an installed Xcode matching all pins by actual command output, run the complete unsigned check at the commit to be tested:
+
+```sh
+Scripts/ci.sh "$(git rev-parse HEAD)"
+```
+
+That command runs helper tests, `swift test` for `Packages/SeatingDomain`, a simulator build, and the `SeatWeaveUITests` launch smoke. It writes the explicit simulator destination, SHA, actual toolchain versions, logs and `.xcresult` bundles to a unique run directory beneath `build/ci-artifacts/`. The shared `SeatWeave` scheme can also be opened directly in Xcode.
+
+CI checks out the pull request head SHA explicitly rather than a synthetic merge commit and follows the same script on macOS. It enumerates installed `Xcode*.app` bundles and selects one only when `xcodebuild -version` reports Xcode 26.0.1 build 17A400 and `xcrun` reports iOS SDK 26.0. A matching application filename alone is insufficient. Linux cannot run Swift/Xcode/iOS simulator validation; a missing pinned Xcode or simulator is an environment blocker, never permission to change a pin or invent a green result.
+
+The bootstrap app has no external dependencies, entitlements, permissions, CloudKit, analytics or networking. CI does not read signing or App Store secrets, and signing is disabled. Release automation belongs to milestone #7 and is not present.
 
 ## Signing and distribution
 
