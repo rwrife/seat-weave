@@ -47,7 +47,7 @@ struct EventStoreTests {
         #expect(try store.load(eventID: UUID()) == nil)
     }
 
-    @Test("Saving twice stores both snapshots, newest wins on load")
+    @Test("Saving the same event twice keeps one record with the latest snapshot")
     func latestSnapshotWins() throws {
         let store = try EventStore.makeTemporaryStore()
         let (event, fixture) = sampleEvent()
@@ -57,6 +57,7 @@ struct EventStoreTests {
         try store.save(commands.currentEvent)
         let loaded = try store.load(eventID: event.id)
         #expect(loaded?.variants.first?.seat(for: fixture.bob)?.seatNumber == 2)
+        #expect(try store.eventCount() == 1)
     }
 
     @Test("Corrupted snapshots fail explicitly, never silently")

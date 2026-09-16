@@ -64,8 +64,20 @@ public struct EventStore {
             throw StoreError.snapshotInvalid
         }
         let context = ModelContext(container)
-        let record = StoredEvent(eventID: event.id, snapshot: data)
-        context.insert(record)
+        let descriptor = FetchDescriptor<StoredEvent>(predicate: #Predicate { $0.eventID == event.id })
+        let records: [StoredEvent]
+        do {
+            records = try context.fetch(descriptor)
+        } catch {
+            throw StoreError.loadFailed(underlying: error)
+        }
+        // One record per event: saving again replaces the stored snapshot.
+        if let existing = records.first {
+            existing.snapshot = data
+            existing.updatedAt = Date()
+        } else {
+            context.insert(StoredEvent(eventID: event.id, snapshot: data))
+        }
         do {
             try context.save()
         } catch {
