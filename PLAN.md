@@ -8,13 +8,15 @@ Native SwiftUI avoids cross-platform/plugin overhead and gives iOS accessibility
 
 The required primary platform is iOS 26.0+. Build/CI baseline is pinned in toolchain.json to Xcode 26.0.1 (17A400), iOS 26.0 SDK, Swift 6 language mode. CI must inspect actual versions, not infer them from an application directory name. A future reviewed update can select a newer SDK, never one below 26.
 
-### Proposed source tree (not present yet)
+### Current bootstrap source tree
 
-- `SeatWeave.xcodeproj`, shared `SeatWeave` scheme and `App/`: native entry point, navigation, local persistence and exports.
-- `Packages/SeatingDomain/`: dependency-free commands, rules, validation and fixtures; Swift Testing tests.
-- `Tests/` and `UITests/`: persistence, export, compact/regular-width and accessibility journeys.
-- `.github/workflows/ci.yml`: macOS pinned-toolchain build/test and artifact provenance.
-- `.github/workflows/release.yml`: approved signed archive/TestFlight workflow; no signing on untrusted PRs.
+- `SeatWeave.xcodeproj` and shared `SeatWeave` scheme: committed native project linking the local package, with iOS 26.0/Swift 6 and signing disabled for bootstrap CI.
+- `App/`: native SwiftUI entry point and an honest bootstrap home; no event or seating flow is claimed.
+- `Packages/SeatingDomain/`: dependency-free pure Swift baseline identity, bounds and preference vocabulary contracts with Swift Testing tests. Commands and rules remain issue #2 work.
+- `UITests/`: simulator launch smoke for the bootstrap home. Persistence, export and complete workflow journeys remain later milestones.
+- `Scripts/`: exact toolchain/simulator selection, helper unit tests and a repeatable CI entry point.
+- `.github/workflows/ci.yml`: exact pull-request-head checkout, pinned macOS toolchain validation, unsigned simulator build/test and always-uploaded result provenance.
+- Release workflow is intentionally absent until milestone #7; bootstrap PR CI uses no secrets.
 
 ### Domain invariants
 

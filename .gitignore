@@ -1,5 +1,7 @@
 # macOS and Xcode local state
 .DS_Store
+__pycache__/
+*.pyc
 DerivedData/
 build/
 .build/
