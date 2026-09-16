@@ -12,7 +12,9 @@ from typing import Callable, Sequence
 
 
 class SimulatorBootError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, timed_out: bool = False) -> None:
+        super().__init__(message)
+        self.timed_out = timed_out
 
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
@@ -49,7 +51,7 @@ def run_logged(
             log.write(_text(error.output))
             message = f"{' '.join(command)} timed out after {timeout}s"
             log.write(f"{message}\n")
-            raise SimulatorBootError(message) from error
+            raise SimulatorBootError(message, timed_out=True) from error
         log.write(_text(result.stdout))
         if result.returncode != 0:
             message = f"{' '.join(command)} exited {result.returncode}"
@@ -67,6 +69,28 @@ def device_state(payload: dict, udid: str) -> str:
     raise SimulatorBootError(f"Selected simulator {udid} is missing from the device list")
 
 
+def _shutdown_quietly(udid: str, log_path: Path, *, timeout: int, runner: Runner) -> None:
+    """Best-effort bounded shutdown so a retry starts from a clean state."""
+    with log_path.open("a", encoding="utf-8") as log:
+        log.write(f"$ xcrun simctl shutdown {udid} (recovery)\n")
+        log.flush()
+        try:
+            result = runner(
+                ["xcrun", "simctl", "shutdown", udid],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+            )
+            log.write(_text(result.stdout))
+            if result.returncode != 0:
+                log.write(f"shutdown exited {result.returncode} (tolerated)\n")
+        except subprocess.TimeoutExpired as error:
+            log.write(_text(error.output))
+            log.write(f"shutdown timed out after {timeout}s (tolerated)\n")
+
+
 def boot_selected_simulator(
     udid: str,
     devices: dict,
@@ -74,6 +98,7 @@ def boot_selected_simulator(
     *,
     boot_timeout: int = 120,
     bootstatus_timeout: int = 180,
+    shutdown_timeout: int = 30,
     runner: Runner = subprocess.run,
 ) -> None:
     state = device_state(devices, udid)
@@ -81,19 +106,42 @@ def boot_selected_simulator(
     if state == "Booted":
         with log_path.open("a", encoding="utf-8") as log:
             log.write("Simulator is already Booted; skipping simctl boot.\n")
-    else:
         run_logged(
-            ["xcrun", "simctl", "boot", udid],
-            boot_timeout,
+            ["xcrun", "simctl", "bootstatus", udid, "-b"],
+            bootstatus_timeout,
             log_path,
             runner=runner,
         )
-    run_logged(
-        ["xcrun", "simctl", "bootstatus", udid, "-b"],
-        bootstatus_timeout,
-        log_path,
-        runner=runner,
-    )
+        return
+
+    attempts = 0
+    while True:
+        attempts += 1
+        try:
+            run_logged(
+                ["xcrun", "simctl", "boot", udid],
+                boot_timeout,
+                log_path,
+                runner=runner,
+            )
+            run_logged(
+                ["xcrun", "simctl", "bootstatus", udid, "-b"],
+                bootstatus_timeout,
+                log_path,
+                runner=runner,
+            )
+            return
+        except SimulatorBootError as error:
+            # Hosted runners occasionally hand out a wedged CoreSimulator
+            # device whose boot/bootstatus hangs. One bounded
+            # shutdown-and-retry recovers without loosening any timeout.
+            if attempts >= 2 or not error.timed_out:
+                raise
+            with log_path.open("a", encoding="utf-8") as log:
+                log.write(
+                    "Simulator startup timed out; shutting down and retrying once.\n"
+                )
+            _shutdown_quietly(udid, log_path, timeout=shutdown_timeout, runner=runner)
 
 
 def capture_command(command: list[str], output: Path, timeout: int) -> int:

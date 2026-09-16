@@ -59,14 +59,82 @@ class BootTests(unittest.TestCase):
         timeout = subprocess.TimeoutExpired(
             ["xcrun", "simctl", "boot", "PHONE-26"], 120, output="partial boot\n"
         )
-        runner = FakeRunner([timeout])
+        # First boot times out; the bounded recovery retries once (shutdown,
+        # second boot) and still fails, preserving the timeout diagnostics.
+        runner = FakeRunner(
+            [timeout, self.completed(), timeout]
+        )
 
         with self.assertRaisesRegex(SimulatorBootError, "timed out after 120"):
             boot_selected_simulator(
                 "PHONE-26", devices(), self.log_path, runner=runner
             )
 
-        self.assertIn("partial boot", self.log_path.read_text())
+        log = self.log_path.read_text()
+        self.assertIn("partial boot", log)
+        self.assertIn("retrying once", log)
+        self.assertEqual(len(runner.calls), 3)
+        self.assertEqual(runner.calls[1][0][2], "shutdown")
+        self.assertEqual(runner.calls[2][0][2], "boot")
+
+    def test_bootstatus_timeout_shuts_down_and_retries_once(self):
+        bootstatus_timeout = subprocess.TimeoutExpired(
+            ["xcrun", "simctl", "bootstatus", "PHONE-26", "-b"],
+            180,
+            output="waiting\n",
+        )
+        runner = FakeRunner(
+            [
+                self.completed(output="boot requested\n"),
+                bootstatus_timeout,
+                self.completed(output="shutdown ok\n"),
+                self.completed(output="boot requested\n"),
+                self.completed(output="ready\n"),
+            ]
+        )
+
+        boot_selected_simulator("PHONE-26", devices(), self.log_path, runner=runner)
+
+        log = self.log_path.read_text()
+        self.assertIn("retrying once", log)
+        calls = [call[0][2] for call in runner.calls]
+        self.assertEqual(calls, ["boot", "bootstatus", "shutdown", "boot", "bootstatus"])
+
+    def test_second_startup_timeout_is_not_retried(self):
+        boot_timeout = subprocess.TimeoutExpired(
+            ["xcrun", "simctl", "boot", "PHONE-26"], 120, output="first\n"
+        )
+        second_timeout = subprocess.TimeoutExpired(
+            ["xcrun", "simctl", "boot", "PHONE-26"], 120, output="second\n"
+        )
+        runner = FakeRunner([boot_timeout, self.completed(), second_timeout])
+
+        with self.assertRaisesRegex(SimulatorBootError, "timed out after 120"):
+            boot_selected_simulator(
+                "PHONE-26", devices(), self.log_path, runner=runner
+            )
+
+        # Exactly one retry: boot, (failed) then shutdown + boot, (failed) -> stop.
+        self.assertEqual(len(runner.calls), 3)
+
+    def test_shutdown_failure_is_tolerated_during_recovery(self):
+        boot_timeout = subprocess.TimeoutExpired(
+            ["xcrun", "simctl", "boot", "PHONE-26"], 120, output="first\n"
+        )
+        runner = FakeRunner(
+            [
+                boot_timeout,
+                self.completed(returncode=5, output="shutdown failed\n"),
+                self.completed(output="boot requested\n"),
+                self.completed(output="ready\n"),
+            ]
+        )
+
+        boot_selected_simulator("PHONE-26", devices(), self.log_path, runner=runner)
+
+        log = self.log_path.read_text()
+        self.assertIn("shutdown failed", log)
+        self.assertIn("tolerated", log)
 
     def test_boot_nonzero_exit_is_not_ignored(self):
         runner = FakeRunner([self.completed(returncode=9, output="boot failed\n")])
