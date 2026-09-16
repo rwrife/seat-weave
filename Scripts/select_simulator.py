@@ -28,19 +28,47 @@ def select_destination(payload: dict, sdk_version: str) -> str:
     return str(candidates[0]["udid"])
 
 
+def enumerate_available_devices(
+    *,
+    runner=subprocess.run,
+    timeout: int = 30,
+    attempts: int = 2,
+) -> str:
+    """Enumerate available simulators with bounded retries.
+
+    Hosted runners occasionally stall the first `simctl list` call; one
+    bounded retry absorbs that without raising any timeout budget.
+    """
+    command = ["xcrun", "simctl", "list", "devices", "available", "--json"]
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return runner(
+                command,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                timeout=timeout,
+            ).stdout
+        except subprocess.TimeoutExpired as error:
+            last_error = error
+            if attempt < attempts:
+                print(
+                    "Simulator enumeration timed out after "
+                    f"{timeout}s; retrying once.",
+                    file=sys.stderr,
+                )
+    assert last_error is not None
+    raise last_error
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sdk", required=True)
     parser.add_argument("--devices-json-out", type=argparse.FileType("w", encoding="utf-8"))
     args = parser.parse_args()
     try:
-        output = subprocess.run(
-            ["xcrun", "simctl", "list", "devices", "available", "--json"],
-            check=True,
-            text=True,
-            stdout=subprocess.PIPE,
-            timeout=30,
-        ).stdout
+        output = enumerate_available_devices()
         if args.devices_json_out:
             args.devices_json_out.write(output)
         udid = select_destination(json.loads(output), args.sdk)

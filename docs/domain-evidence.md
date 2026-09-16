@@ -45,6 +45,15 @@ macOS CI (required gate, pinned Xcode 26.0.1 build 17A400, iOS SDK 26.0):
   the previous visible state and surfaces failure; rejected commands never
   reach the saver.
 
+## CI repair during this issue
+
+Run 35161312959 (head 45d3032) failed only in `simulator_selection`: the
+first `xcrun simctl list devices available --json` stalled past its 30-second
+seconds on a hosted runner (the same transient class fixed for boot in
+PR #8). `select_simulator.py` now retries enumeration once with the same
+30-second bound before failing, covered by two new helper tests (20
+helper tests total, all passing on Linux). No timeout was loosened.
+
 ## Not claimed
 
 - No seating UI, export, backup, release, signing, TestFlight or

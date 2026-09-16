@@ -1,6 +1,44 @@
+import subprocess
 import unittest
 
-from Scripts.select_simulator import DestinationError, select_destination
+from Scripts.select_simulator import (
+    DestinationError,
+    enumerate_available_devices,
+    select_destination,
+)
+
+
+class EnumerationTests(unittest.TestCase):
+    class FakeRunner:
+        def __init__(self, results):
+            self.results = iter(results)
+            self.calls = []
+
+        def __call__(self, command, **kwargs):
+            self.calls.append(command)
+            result = next(self.results)
+            if isinstance(result, BaseException):
+                raise result
+            return result
+
+    def test_times_out_then_succeeds_on_retry(self):
+        timeout = subprocess.TimeoutExpired(["xcrun", "simctl", "list"], 30)
+        completed = subprocess.CompletedProcess([], 0, '{"devices": {}}')
+        runner = self.FakeRunner([timeout, completed])
+
+        output = enumerate_available_devices(runner=runner, timeout=30)
+
+        self.assertEqual(output, '{"devices": {}}')
+        self.assertEqual(len(runner.calls), 2)
+
+    def test_repeated_timeouts_are_not_swallowed(self):
+        timeout = subprocess.TimeoutExpired(["xcrun", "simctl", "list"], 30)
+        runner = self.FakeRunner([timeout, timeout])
+
+        with self.assertRaises(subprocess.TimeoutExpired):
+            enumerate_available_devices(runner=runner, timeout=30)
+
+        self.assertEqual(len(runner.calls), 2)
 
 
 class DestinationTests(unittest.TestCase):
