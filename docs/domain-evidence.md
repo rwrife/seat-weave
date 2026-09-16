@@ -45,14 +45,26 @@ macOS CI (required gate, pinned Xcode 26.0.1 build 17A400, iOS SDK 26.0):
   the previous visible state and surfaces failure; rejected commands never
   reach the saver.
 
-## CI repair during this issue
+## CI repairs during this issue
 
 Run 35161312959 (head 45d3032) failed only in `simulator_selection`: the
-first `xcrun simctl list devices available --json` stalled past its 30-second
+first `xcrun simctl list devices available --json` stalled past its 30
 seconds on a hosted runner (the same transient class fixed for boot in
 PR #8). `select_simulator.py` now retries enumeration once with the same
-30-second bound before failing, covered by two new helper tests (20
-helper tests total, all passing on Linux). No timeout was loosened.
+30-second bound before failing.
+
+Run 35162091105 (head 00d077a) proved the retry itself exposed a latent
+bug: when the first attempt timed out, the successful retry wrote the
+devices JSON without flushing, and the child interpreter's exit-time
+finalization of the still-referenced file handle produced an empty file;
+the next phase then died with `Expecting value: line 1 column 1`. The
+sequence was reproduced locally with a fake stalling `xcrun` (empty file
+without the fix, valid JSON with it). Fixes: `main()` now flushes the
+devices JSON immediately, and a subprocess-level helper test drives the
+real CLI against a fake one-shot-stalling `xcrun` (with a test-only
+`SEATWEAVE_SIMCTL_TIMEOUT_SECONDS` override). Helper coverage is 21
+tests, all passing on Linux, including the regression test. No CI
+timeout budget was loosened.
 
 ## Not claimed
 
