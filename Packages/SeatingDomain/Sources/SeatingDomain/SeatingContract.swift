@@ -10,7 +10,7 @@ public enum SeatingLimits {
 }
 
 /// Identity is deliberately separate from a guest's user-editable display name.
-public struct GuestIdentity: Hashable, Sendable {
+public struct GuestIdentity: Codable, Hashable, Sendable {
     public let id: UUID
     public var displayName: String
 
@@ -29,7 +29,7 @@ public struct GuestIdentity: Hashable, Sendable {
 }
 
 /// The only preference vocabulary promised by the MVP plan.
-public enum PairPreferenceKind: String, CaseIterable, Sendable {
+public enum PairPreferenceKind: String, CaseIterable, Codable, Sendable {
     case sameTable
     case differentTables
     case adjacent

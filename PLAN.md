@@ -12,7 +12,7 @@ The required primary platform is iOS 26.0+. Build/CI baseline is pinned in toolc
 
 - `SeatWeave.xcodeproj` and shared `SeatWeave` scheme: committed native project linking the local package, with iOS 26.0/Swift 6 and signing disabled for bootstrap CI.
 - `App/`: native SwiftUI entry point and an honest bootstrap home; no event or seating flow is claimed.
-- `Packages/SeatingDomain/`: dependency-free pure Swift baseline identity, bounds and preference vocabulary contracts with Swift Testing tests. Commands and rules remain issue #2 work.
+- `Packages/SeatingDomain/`: dependency-free pure Swift domain module — event/guest/table/variant model with published bounds, atomic assign/move/swap/unseat/resize/undo commands, three-state explainable rule evaluation, deterministic randomized occupancy invariants, Codable event documents and a SwiftData file store (Apple platforms). The seating UI, exports and backup flows remain later milestones.
 - `UITests/`: simulator launch smoke for the bootstrap home. Persistence, export and complete workflow journeys remain later milestones.
 - `Scripts/`: exact toolchain/simulator selection, helper unit tests and a repeatable CI entry point.
 - `.github/workflows/ci.yml`: exact pull-request-head checkout, pinned macOS toolchain validation, unsigned simulator build/test and always-uploaded result provenance.

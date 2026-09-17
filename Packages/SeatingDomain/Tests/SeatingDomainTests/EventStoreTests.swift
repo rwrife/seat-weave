@@ -1,0 +1,73 @@
+#if canImport(SwiftData)
+import Foundation
+import Testing
+@testable import SeatingDomain
+
+/// Runs only where SwiftData exists (macOS/iOS CI). Each test gets a fresh
+/// isolated temporary store; nothing is shared between tests or with the app.
+@Suite("Issue 2 SwiftData store")
+struct EventStoreTests {
+    private func sampleEvent() -> (SeatingEvent, Fixture) {
+        let fixture = Fixture(seats: 6)
+        var commands = SeatingCommands(event: fixture.event)
+        try? commands.assign(variantID: fixture.variantID, guestID: fixture.alice, tableID: fixture.tableID, seatNumber: 1)
+        try? commands.addPreference(firstGuestID: fixture.alice, secondGuestID: fixture.bob, kind: .sameTable)
+        return (commands.currentEvent, fixture)
+    }
+
+    @Test("Saved events reload completely and unchanged")
+    func roundTrip() throws {
+        let store = try EventStore.makeTemporaryStore()
+        let (event, _) = sampleEvent()
+        try store.save(event)
+        let loaded = try store.load(eventID: event.id)
+        #expect(loaded == event)
+        #expect(try store.eventCount() == 1)
+    }
+
+    @Test("A reopened store at the same location reads committed data")
+    func restartReadsCommittedData() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("seatweave-restart-\(UUID().uuidString)", isDirectory: true)
+        let (event, _) = sampleEvent()
+        do {
+            let store = try EventStore.makeFileStore(directory: directory)
+            try store.save(event)
+        }
+        let reopened = try EventStore.makeFileStore(directory: directory)
+        let loaded = try reopened.load(eventID: event.id)
+        #expect(loaded?.guests.count == event.guests.count)
+        #expect(loaded?.variants.first?.seat(for: event.guests[0].id)?.seatNumber == 1)
+        #expect(loaded?.preferences.count == 1)
+    }
+
+    @Test("Unknown event identifiers load as nil")
+    func unknownEventIsNil() throws {
+        let store = try EventStore.makeTemporaryStore()
+        #expect(try store.load(eventID: UUID()) == nil)
+    }
+
+    @Test("Saving the same event twice keeps one record with the latest snapshot")
+    func latestSnapshotWins() throws {
+        let store = try EventStore.makeTemporaryStore()
+        let (event, fixture) = sampleEvent()
+        try store.save(event)
+        var commands = SeatingCommands(event: event)
+        try commands.assign(variantID: fixture.variantID, guestID: fixture.bob, tableID: fixture.tableID, seatNumber: 2)
+        try store.save(commands.currentEvent)
+        let loaded = try store.load(eventID: event.id)
+        #expect(loaded?.variants.first?.seat(for: fixture.bob)?.seatNumber == 2)
+        #expect(try store.eventCount() == 1)
+    }
+
+    @Test("Corrupted snapshots fail explicitly, never silently")
+    func corruptedSnapshotFails() throws {
+        let store = try EventStore.makeTemporaryStore()
+        let id = UUID()
+        try store.saveCorruptSnapshot(eventID: id)
+        #expect(throws: EventStore.StoreError.self) {
+            _ = try store.load(eventID: id)
+        }
+    }
+}
+#endif

@@ -1,5 +1,5 @@
 {
-  "status": "planned-build-baseline-not-yet-exercised",
+  "status": "exercised-by-pinned-macos-ci-2026-09",
   "xcode_version": "26.0.1",
   "xcode_build": "17A400",
   "iphoneos_sdk": "26.0",

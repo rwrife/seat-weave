@@ -6,7 +6,7 @@ Local-first iPhone seating planner for small gatherings: arrange guests beside a
 
 Hosts of dinner parties, family celebrations and small hobby meetups often juggle a guest list and a sketch while moving people between tables. Seat Weave keeps both views connected, explains conflicting preferences, and preserves alternatives without turning a small gathering into wedding-management software.
 
-**Status: native bootstrap built and launch-tested in pinned macOS CI.** [Bootstrap evidence](docs/bootstrap-evidence.md) records the exact tested commit, toolchain, simulator and results. The repository contains a native SwiftUI app, linked pure Swift domain package, baseline tests and launch smoke test. Event creation and seating remain later milestones, not implemented features. Simulator success is not physical-device, signing, TestFlight or App Store evidence.
+**Status: native bootstrap plus local domain model and rule engine.** [Bootstrap evidence](docs/bootstrap-evidence.md) records the exact tested commit, toolchain, simulator and results. [Domain evidence](docs/domain-evidence.md) records the issue #2 model, commands, three-state rules and persistence verification. The repository contains a native SwiftUI app, the linked pure Swift domain module with tests, a SwiftData event store and baseline launch smoke coverage. The seating UI, export and backup flows remain later milestones, not implemented features. Simulator success is not physical-device, signing, TestFlight or App Store evidence.
 
 ## Intended end-to-end workflow
 
