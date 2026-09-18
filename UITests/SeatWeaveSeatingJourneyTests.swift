@@ -81,8 +81,8 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Swap seats?"].waitForExistence(timeout: 5))
         let explanation = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@", "Aster moves to")
-        ).first
-        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
+        )
+        XCTAssertTrue(explanation.element(boundBy: 0).waitForExistence(timeout: 5))
         app.buttons["confirm-swap"].tap()
 
         // After the swap Aster holds seat 2 and Basil holds seat 1.
