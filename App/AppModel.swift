@@ -34,6 +34,9 @@ final class AppModel {
     private(set) var controller: PersistentSeatingController?
     var alertMessage: String?
     var selectedVariantID: UUID?
+    /// Selected guest lives in app state (not view state) so switching
+    /// between the compact Guests/Tables tabs cannot lose the selection.
+    var selectedGuestID: UUID?
 
     private let store: EventStore?
     private let defaults: UserDefaults
@@ -150,6 +153,7 @@ final class AppModel {
     func closeEvent() {
         controller = nil
         selectedVariantID = nil
+        selectedGuestID = nil
         refreshEventList()
     }
 

@@ -1,19 +1,13 @@
 import SeatingDomain
 import SwiftUI
 
-/// Compact-phone seating workspace: roster list, table seat lists,
-/// selection-driven assign/move/swap/unseat/undo, conflict explanations,
-/// destructive-edit previews and variant comparison. Every operation is a
-/// plain tap on a list or toolbar control; nothing depends on dragging.
+/// Compact-phone seating workspace per the README: compact widths
+/// *navigate* between guests and seats instead of one endless list.
+/// The guest selection and plan choice live in `AppModel`, so switching
+/// screens cannot lose context. Every operation is a plain tap on a list,
+/// tab or toolbar control; nothing depends on dragging.
 struct SeatingWorkspaceView: View {
     @Environment(AppModel.self) private var model
-
-    @State private var selectedGuestID: UUID?
-    @State private var pendingSwap: SwapRequest?
-    @State private var deletionTarget: DeletionTarget?
-    @State private var pendingResizeTableID: UUID?
-    @State private var showAddTable = false
-    @State private var showVariants = false
 
     struct SwapRequest: Identifiable {
         let id = UUID()
@@ -29,36 +23,82 @@ struct SeatingWorkspaceView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                Text(model.bannerText)
-                    .font(.callout.weight(.semibold))
-                    .accessibilityIdentifier("seating.summary")
-                Text("Plan: \(model.selectedVariant?.name ?? "none")")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("selected-plan")
-            }
+        TabView {
+            GuestsTab()
+                .tabItem { Label("Guests", systemImage: "person.2") }
+            TablesTab()
+                .tabItem { Label("Tables", systemImage: "circle.grid.circle") }
+            PairsTab()
+                .tabItem { Label("Pairs", systemImage: "heart.text.square") }
+            PlansTab()
+                .tabItem { Label("Plans", systemImage: "square.on.square.dashed") }
+        }
+    }
+}
 
-            if let event = model.event, let variant = model.selectedVariant {
+/// Title and shared Undo/Close toolbar, applied per tab because toolbars
+/// attach to the active tab's navigation item, not the TabView itself.
+struct WorkspaceChrome: ViewModifier {
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(model.event?.title ?? "Seat Weave")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Undo") { model.undo() }
+                        .disabled(!model.canUndo)
+                        .accessibilityIdentifier("undo-button")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") { model.closeEvent() }
+                        .accessibilityIdentifier("close-event-button")
+                }
+            }
+    }
+}
+
+/// Status rows repeated on every tab so the banner, selected plan and
+/// current selection read identically from any screen.
+struct WorkspaceStatusSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Text(model.bannerText)
+            .font(.callout.weight(.semibold))
+            .accessibilityIdentifier("seating.summary")
+        Text("Plan: \(model.selectedVariant?.name ?? "none")")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("selected-plan")
+    }
+}
+
+/// Roster screen: alias-capable guest list, selection controls and
+/// previewed destructive deletion.
+struct GuestsTab: View {
+    @Environment(AppModel.self) private var model
+    @State private var deletionTarget: SeatingWorkspaceView.DeletionTarget?
+
+    var body: some View {
+        List {
+            Section { WorkspaceStatusSection() }
+            if let event = model.event {
                 Section("Selected guest") {
-                    if let guestID = selectedGuestID, let guest = event.guest(guestID) {
+                    if let guestID = model.selectedGuestID, let guest = event.guest(guestID) {
                         Text("\(guest.displayName) — \(model.seatLabel(for: guestID))")
                             .accessibilityIdentifier("selection.current")
                         Button("Unseat") { unseat(guestID: guestID) }
                             .accessibilityIdentifier("unseat-button")
-                        Button("Delete guest") {
-                            showDeletionSheet(guestID: guestID)
-                        }
-                        .accessibilityIdentifier("delete-guest-button")
-                        Button("Clear selection") { selectedGuestID = nil }
+                        Button("Delete guest") { showDeletionSheet(guestID: guestID) }
+                            .accessibilityIdentifier("delete-guest-button")
+                        Button("Clear selection") { model.selectedGuestID = nil }
                             .accessibilityIdentifier("clear-selection-button")
                     } else {
-                        Text("Tap a guest to select, then tap a seat.")
+                        Text("Tap a guest to select, then choose a seat on Tables.")
                             .foregroundStyle(.secondary)
                     }
                 }
-
                 Section("Guests") {
                     ForEach(event.guests, id: \.self) { guest in
                         rosterRow(guest: guest)
@@ -69,75 +109,23 @@ struct SeatingWorkspaceView: View {
                     }
                     AddGuestRow()
                 }
-
-                Section("Tables") {
-                    ForEach(variant.tables) { table in
-                        ForEach(1...table.seatCount, id: \.self) { seatNumber in
-                            seatRow(table: table, seatNumber: seatNumber, variant: variant, event: event)
-                        }
-                        Button("Resize \(table.label)") {
-                            pendingResizeTableID = table.id
-                        }
-                        .accessibilityIdentifier("resize-\(table.label)")
-                    }
-                    Button("Add table") { showAddTable = true }
-                        .accessibilityIdentifier("add-table-button")
-                }
-
-                Section("Pair preferences") {
-                    preferenceSection(event: event, variant: variant)
-                }
             }
-        }
-        .navigationTitle(model.event?.title ?? "Seat Weave")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Undo") { model.undo() }
-                    .disabled(!model.canUndo)
-                    .accessibilityIdentifier("undo-button")
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button("Plans") { showVariants = true }
-                    .accessibilityIdentifier("plans-button")
-                Button("Close") {
-                    selectedGuestID = nil
-                    model.closeEvent()
-                }
-                .accessibilityIdentifier("close-event-button")
-            }
-        }
-        .sheet(isPresented: $showVariants) { VariantsSheet() }
-        .sheet(isPresented: $showAddTable) { AddTableSheet() }
-        .sheet(item: $pendingSwap) { request in
-            SwapConfirmationSheet(request: request) { pendingSwap = nil }
         }
         .sheet(item: $deletionTarget) { target in
             DeleteGuestSheet(target: target) {
-                if selectedGuestID == target.id { selectedGuestID = nil }
+                if model.selectedGuestID == target.id { model.selectedGuestID = nil }
                 deletionTarget = nil
             }
         }
-        .sheet(item: Binding(
-            get: { pendingResizeTableID.map { ResizeBox(tableID: $0) } },
-            set: { pendingResizeTableID = $0?.tableID }
-        )) { box in
-            ResizePlanSheet(tableID: box.tableID) { pendingResizeTableID = nil }
-        }
         .modifier(FailureAlertModifier())
+        .modifier(WorkspaceChrome())
     }
-
-    private struct ResizeBox: Identifiable {
-        let tableID: UUID
-        var id: UUID { tableID }
-    }
-
-    // MARK: - Roster
 
     @ViewBuilder
     private func rosterRow(guest: GuestIdentity) -> some View {
         let seatLabel = model.seatLabel(for: guest.id)
         Button {
-            selectedGuestID = guest.id
+            model.selectedGuestID = guest.id
         } label: {
             HStack {
                 VStack(alignment: .leading) {
@@ -147,7 +135,7 @@ struct SeatingWorkspaceView: View {
                         .foregroundStyle(seatLabel == "Unseated" ? .secondary : .primary)
                 }
                 Spacer()
-                if selectedGuestID == guest.id {
+                if model.selectedGuestID == guest.id {
                     Image(systemName: "checkmark.circle.fill")
                 }
             }
@@ -158,7 +146,80 @@ struct SeatingWorkspaceView: View {
         .accessibilityLabel("\(guest.displayName), \(seatLabel)")
     }
 
-    // MARK: - Seats
+    private func unseat(guestID: UUID) {
+        guard let variantID = model.selectedVariantID else { return }
+        model.perform { controller in
+            try controller.perform { commands in
+                try commands.unseat(variantID: variantID, guestID: guestID)
+            }
+        }
+        if model.alertMessage == nil { model.selectedGuestID = nil }
+    }
+
+    private func showDeletionSheet(guestID: UUID) {
+        do {
+            guard let preview = try model.controller?.guestDeletionPreview(guestID: guestID) else { return }
+            deletionTarget = SeatingWorkspaceView.DeletionTarget(id: guestID, preview: preview)
+        } catch {
+            model.alertMessage = error.localizedDescription
+        }
+    }
+}
+
+/// Table screen: per-table seat lists with selection-driven assign/move,
+/// confirmed occupied-seat swaps, resize-behind-preview and table adding.
+struct TablesTab: View {
+    @Environment(AppModel.self) private var model
+    @State private var pendingSwap: SeatingWorkspaceView.SwapRequest?
+    @State private var pendingResizeTableID: UUID?
+    @State private var showAddTable = false
+
+    var body: some View {
+        List {
+            Section { WorkspaceStatusSection() }
+            if let event = model.event, let variant = model.selectedVariant {
+                if model.selectedGuestID != nil {
+                    Section {
+                        Text("Selected: \(event.guest(model.selectedGuestID!)?.displayName ?? "?") — \(model.seatLabel(for: model.selectedGuestID!)). Tap a seat below.")
+                            .font(.subheadline)
+                            .accessibilityIdentifier("tables.selection-hint")
+                    }
+                }
+                ForEach(variant.tables) { table in
+                    Section(table.label) {
+                        ForEach(1...table.seatCount, id: \.self) { seatNumber in
+                            seatRow(table: table, seatNumber: seatNumber, variant: variant, event: event)
+                        }
+                        Button("Resize \(table.label)") {
+                            pendingResizeTableID = table.id
+                        }
+                        .accessibilityIdentifier("resize-\(table.label)")
+                    }
+                }
+                Section {
+                    Button("Add table") { showAddTable = true }
+                        .accessibilityIdentifier("add-table-button")
+                }
+            }
+        }
+        .sheet(isPresented: $showAddTable) { AddTableSheet() }
+        .sheet(item: $pendingSwap) { request in
+            SwapConfirmationSheet(request: request) { pendingSwap = nil }
+        }
+        .sheet(item: Binding(
+            get: { pendingResizeTableID.map { ResizeBox(tableID: $0) } },
+            set: { pendingResizeTableID = $0?.tableID }
+        )) { box in
+            ResizePlanSheet(tableID: box.tableID) { pendingResizeTableID = nil }
+        }
+        .modifier(FailureAlertModifier())
+        .modifier(WorkspaceChrome())
+    }
+
+    private struct ResizeBox: Identifiable {
+        let tableID: UUID
+        var id: UUID { tableID }
+    }
 
     @ViewBuilder
     private func seatRow(table: SeatingTable, seatNumber: Int, variant: PlanVariant, event: SeatingEvent) -> some View {
@@ -171,7 +232,7 @@ struct SeatingWorkspaceView: View {
             HStack {
                 Text(text)
                 Spacer()
-                if let selectedGuestID,
+                if let selectedGuestID = model.selectedGuestID,
                    let seat = variant.seat(for: selectedGuestID),
                    seat.tableID == table.id, seat.seatNumber == seatNumber {
                     Image(systemName: "person.crop.circle.badge.checkmark")
@@ -184,13 +245,70 @@ struct SeatingWorkspaceView: View {
         .accessibilityLabel(text)
     }
 
-    // MARK: - Preferences and warnings
+    private func seatTapped(table: SeatingTable, seatNumber: Int, variant: PlanVariant) {
+        guard let variantID = model.selectedVariantID else { return }
+        let occupantID = variant.occupant(tableID: table.id, seatNumber: seatNumber)
+        guard let guestID = model.selectedGuestID else {
+            // No selection: tapping an occupied seat picks up its guest.
+            model.selectedGuestID = occupantID
+            return
+        }
+        if let occupantID, occupantID == guestID {
+            model.selectedGuestID = nil
+            return
+        }
+        let moverIsSeated = variant.seat(for: guestID) != nil
+        if let occupantID, moverIsSeated {
+            pendingSwap = SeatingWorkspaceView.SwapRequest(
+                movingGuestID: guestID,
+                occupantGuestID: occupantID,
+                tableID: table.id,
+                targetSeat: seatNumber
+            )
+            return
+        }
+        if occupantID != nil, !moverIsSeated {
+            // An unseated guest never displaces a seated one silently.
+            model.alertMessage = "That seat is taken; use swap with confirmation."
+            return
+        }
+        if moverIsSeated {
+            model.perform { controller in
+                try controller.perform { commands in
+                    try commands.move(variantID: variantID, guestID: guestID, tableID: table.id, seatNumber: seatNumber)
+                }
+            }
+        } else {
+            model.perform { controller in
+                try controller.perform { commands in
+                    try commands.assign(variantID: variantID, guestID: guestID, tableID: table.id, seatNumber: seatNumber)
+                }
+            }
+        }
+        if model.alertMessage == nil { model.selectedGuestID = nil }
+    }
+}
 
-    /// Host-entered pair preferences with explicit kinds plus this
-    /// variant's live conflict/unresolved explanations. Unseated pairs are
-    /// shown as unresolved, never silently satisfied.
+/// Preferences screen: host-entered pair rules with live
+/// satisfied/conflict/unresolved explanations and visible contradictions.
+struct PairsTab: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        List {
+            Section { WorkspaceStatusSection() }
+            if let event = model.event, let variant = model.selectedVariant {
+                Section("Pair preferences") {
+                    preferencesAndWarnings(event: event, variant: variant)
+                }
+            }
+        }
+        .modifier(FailureAlertModifier())
+        .modifier(WorkspaceChrome())
+    }
+
     @ViewBuilder
-    private func preferenceSection(event: SeatingEvent, variant: PlanVariant) -> some View {
+    private func preferencesAndWarnings(event: SeatingEvent, variant: PlanVariant) -> some View {
         let evaluations = RuleEngine.evaluate(event: event, variant: variant)
         let notable = evaluations.filter { $0.status != .satisfied }
 
@@ -212,14 +330,16 @@ struct SeatingWorkspaceView: View {
                 }
                 Spacer()
                 Button("Remove") {
-                    remove(preference)
+                    model.perform { controller in
+                        try controller.perform { commands in
+                            _ = try commands.removePreference(id: preference.id)
+                        }
+                    }
                 }
                 .accessibilityIdentifier("remove-preference")
             }
         }
-        // Contradictions on the same guest pair stay visible, never auto-deleted.
-        let contradictionNames = contradictionExplanations(event: event)
-        ForEach(Array(contradictionNames.enumerated()), id: \.offset) { _, text in
+        ForEach(Array(contradictionExplanations(event: event).enumerated()), id: \.offset) { _, text in
             Label(text, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
                 .foregroundStyle(.red)
@@ -249,77 +369,92 @@ struct SeatingWorkspaceView: View {
             return "\(first) and \(second) have contradictory preferences; both remain listed."
         }
     }
+}
 
-    private func remove(_ preference: PairPreference) {
-        model.perform { controller in
-            try controller.perform { commands in
-                _ = try commands.removePreference(id: preference.id)
-            }
-        }
-    }
+/// Variant comparison screen: select/duplicate/rename plans side by side.
+struct PlansTab: View {
+    @Environment(AppModel.self) private var model
+    @State private var renameTarget: UUID?
+    @State private var renameText = ""
 
-    // MARK: - Seat tap routing
-
-    private func seatTapped(table: SeatingTable, seatNumber: Int, variant: PlanVariant) {
-        guard let variantID = model.selectedVariantID else { return }
-        let occupantID = variant.occupant(tableID: table.id, seatNumber: seatNumber)
-        guard let guestID = selectedGuestID else {
-            // No selection: tapping an occupied seat picks up its guest.
-            selectedGuestID = occupantID
-            return
-        }
-        if let occupantID, occupantID == guestID {
-            selectedGuestID = nil
-            return
-        }
-        let moverIsSeated = variant.seat(for: guestID) != nil
-        if let occupantID, moverIsSeated {
-            pendingSwap = SwapRequest(
-                movingGuestID: guestID,
-                occupantGuestID: occupantID,
-                tableID: table.id,
-                targetSeat: seatNumber
-            )
-            return
-        }
-        if occupantID != nil, !moverIsSeated {
-            // An unseated guest never displaces a seated one silently.
-            model.alertMessage = "That seat is taken; use swap with confirmation."
-            return
-        }
-        if moverIsSeated {
-            model.perform { controller in
-                try controller.perform { commands in
-                    try commands.move(variantID: variantID, guestID: guestID, tableID: table.id, seatNumber: seatNumber)
+    var body: some View {
+        List {
+            Section { WorkspaceStatusSection() }
+            Section("Compare plans") {
+                ForEach(model.allVariantSummaries(), id: \.variantID) { summary in
+                    variantRow(summary)
                 }
             }
-        } else {
-            model.perform { controller in
-                try controller.perform { commands in
-                    try commands.assign(variantID: variantID, guestID: guestID, tableID: table.id, seatNumber: seatNumber)
+            if renameTarget != nil {
+                Section("Rename selected plan") {
+                    TextField("New plan name", text: $renameText)
+                        .accessibilityIdentifier("rename-plan-field")
+                    Button("Rename") { rename() }
+                        .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("confirm-rename-plan")
                 }
             }
         }
-        if model.alertMessage == nil { selectedGuestID = nil }
+        .modifier(FailureAlertModifier())
+        .modifier(WorkspaceChrome())
     }
 
-    private func unseat(guestID: UUID) {
-        guard let variantID = model.selectedVariantID else { return }
-        model.perform { controller in
-            try controller.perform { commands in
-                try commands.unseat(variantID: variantID, guestID: guestID)
+    @ViewBuilder
+    private func variantRow(_ summary: AppModel.VariantSummary) -> some View {
+        let isSelected = summary.variantID == model.selectedVariantID
+        Button {
+            model.select(variantID: summary.variantID)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(summary.name)
+                        .font(.headline)
+                    Spacer()
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                    }
+                }
+                Text("\(summary.seated) seated · \(summary.unseated) unseated · \(summary.conflicts) conflicts · \(summary.unresolved) unresolved")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("plan-\(summary.name)")
+        .contextMenu {
+            Button("Duplicate") { duplicate(summary) }
+            Button("Rename") {
+                renameTarget = summary.variantID
+                renameText = summary.name
             }
         }
-        if model.alertMessage == nil { selectedGuestID = nil }
     }
 
-    private func showDeletionSheet(guestID: UUID) {
-        do {
-            guard let preview = try model.controller?.guestDeletionPreview(guestID: guestID) else { return }
-            deletionTarget = DeletionTarget(id: guestID, preview: preview)
-        } catch {
-            model.alertMessage = error.localizedDescription
+    private func duplicate(_ summary: AppModel.VariantSummary) {
+        let copyName = model.allVariantSummaries().contains { $0.name == "\(summary.name) copy" }
+            ? "\(summary.name) copy \(Int.random(in: 100...999))"
+            : "\(summary.name) copy"
+        model.perform { controller in
+            try controller.perform { commands in
+                _ = try commands.duplicateVariant(id: summary.variantID, newName: copyName)
+            }
         }
+        if model.alertMessage == nil, let last = model.event?.variants.last {
+            model.select(variantID: last.id)
+        }
+    }
+
+    private func rename() {
+        guard let renameTarget else { return }
+        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        model.perform { controller in
+            try controller.perform { commands in
+                _ = try commands.renameVariant(id: renameTarget, newName: trimmed)
+            }
+        }
+        if model.alertMessage == nil { self.renameTarget = nil }
     }
 }
 
@@ -390,6 +525,7 @@ struct SwapConfirmationSheet: View {
             }
         }
         if model.alertMessage == nil {
+            model.selectedGuestID = nil
             onDone()
         }
     }
