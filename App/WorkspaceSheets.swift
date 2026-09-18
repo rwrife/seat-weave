@@ -4,11 +4,14 @@ import SwiftUI
 /// Inline guest creation with alias support (no contacts access).
 struct AddGuestRow: View {
     @Environment(AppModel.self) private var model
+    @FocusState private var nameFocused: Bool
     @State private var name = ""
 
     var body: some View {
         HStack {
             TextField("Add guest (alias ok)", text: $name)
+                .focused($nameFocused)
+                .onSubmit { nameFocused = false }
                 .accessibilityIdentifier("add-guest-field")
             Button("Add") {
                 let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -31,6 +34,7 @@ struct AddGuestRow: View {
 struct AddTableSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var labelFocused: Bool
     @State private var label = ""
     @State private var seatCount = 6
 
@@ -38,6 +42,8 @@ struct AddTableSheet: View {
         NavigationStack {
             Form {
                 TextField("Table label", text: $label)
+                    .focused($labelFocused)
+                    .onSubmit { labelFocused = false }
                     .accessibilityIdentifier("table-label-field")
                 Stepper("Seats: \(seatCount)", value: $seatCount,
                         in: SeatingLimits.minimumSeatsPerTable...SeatingLimits.maximumSeatsPerTable)

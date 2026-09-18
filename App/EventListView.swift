@@ -3,6 +3,7 @@ import SwiftUI
 
 struct EventListView: View {
     @Environment(AppModel.self) private var model
+    @FocusState private var titleFocused: Bool
     @State private var newTitle = ""
 
     var body: some View {
@@ -17,6 +18,8 @@ struct EventListView: View {
             }
             Section("Create a gathering") {
                 TextField("Event title", text: $newTitle)
+                    .focused($titleFocused)
+                    .onSubmit { titleFocused = false }
                     .accessibilityIdentifier("event-title-field")
                 Button("Create event") {
                     if let id = model.createEvent(title: newTitle) {

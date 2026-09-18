@@ -16,15 +16,24 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
     }
 
     /// SwiftUI List purges off-screen cells from the a11y hierarchy.
-    /// Scrolls (both directions) until the element exists again.
+    /// Sweeps down through the list, then back up if needed.
     @discardableResult
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement, timeout: TimeInterval = 12) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if element.exists { return true }
+        // First try without scrolling, then sweep downward.
+        if element.exists { return true }
+        var scrolledDown = 0
+        while Date() < deadline, scrolledDown < 8 {
             app.swipeUp()
+            scrolledDown += 1
             if element.exists { return true }
+        }
+        // Sweep back up in case the element sits above the viewport.
+        var scrolledUp = 0
+        while Date() < deadline, scrolledUp < scrolledDown + 2 {
             app.swipeDown()
+            scrolledUp += 1
+            if element.exists { return true }
         }
         return element.exists
     }
@@ -72,7 +81,7 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
 
         // Create a gathering.
         titleField.tap()
-        titleField.typeText("Synthetic dinner")
+        titleField.typeText("Synthetic dinner\n")
         app.buttons["create-event-button"].tap()
 
         XCTAssertTrue(app.navigationBars["Synthetic dinner"].waitForExistence(timeout: 10))
@@ -89,7 +98,7 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         let labelField = app.textFields["table-label-field"]
         XCTAssertTrue(labelField.waitForExistence(timeout: 5))
         labelField.tap()
-        labelField.typeText("Round1")
+        labelField.typeText("Round1\n")
         app.buttons["confirm-add-table"].tap()
         XCTAssertTrue(reveal(app, app.buttons["seat-Round1-1"]))
 
@@ -177,7 +186,9 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         let field = app.textFields["add-guest-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
-        field.typeText(name)
+        // Trailing newline submits the field, closing the keyboard so it
+        // cannot shrink the list viewport for later steps.
+        field.typeText("\(name)\n")
         app.buttons["add-guest-button"].tap()
         XCTAssertTrue(app.buttons["roster-\(name)"].waitForExistence(timeout: 5))
     }
