@@ -223,7 +223,6 @@ struct VariantsSheet: View {
                         Image(systemName: "checkmark.circle.fill")
                     }
                 }
-                .accessibilityIdentifier("plan-\(summary.name)")
                 Text("\(summary.seated) seated · \(summary.unseated) unseated · \(summary.conflicts) conflicts · \(summary.unresolved) unresolved")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -231,6 +230,7 @@ struct VariantsSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("plan-\(summary.name)")
         .contextMenu {
             Button("Duplicate") { duplicate(summary) }
             Button("Rename") {
