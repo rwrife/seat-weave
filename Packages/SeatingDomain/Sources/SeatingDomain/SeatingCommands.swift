@@ -142,6 +142,20 @@ public struct SeatingCommands {
         return duplicate
     }
 
+    /// Renaming never touches table IDs or assignments; selection and
+    /// comparison rely on this being a pure label change.
+    @discardableResult
+    public mutating func renameVariant(id variantID: UUID, newName: String) throws -> SeatingEvent {
+        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw CommandError("Variant name cannot be empty.") }
+        guard event.variant(variantID) != nil else { throw CommandError("Unknown variant.") }
+        commit { model in
+            let index = model.variants.firstIndex(where: { $0.id == variantID })!
+            model.variants[index].name = name
+        }
+        return event
+    }
+
     /// Capacity changes need an explicit unseat preview first.
     public func resizePreview(variantID: UUID, tableID: UUID, newSeatCount: Int) throws -> TableResizePreview {
         let variant = try requireVariant(variantID)
@@ -247,9 +261,9 @@ public struct SeatingCommands {
     // MARK: - Internals
 
     public struct VariantAssignmentLoss: Hashable, Sendable {
-        let variantID: UUID
-        let variantName: String
-        let assignment: SeatAssignment
+        public let variantID: UUID
+        public let variantName: String
+        public let assignment: SeatAssignment
     }
 
     public struct GuestDeletionPreview: Hashable, Sendable {
