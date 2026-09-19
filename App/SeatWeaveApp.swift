@@ -23,9 +23,11 @@ struct RootView: View {
         Group {
             if model.event != nil {
                 NavigationStack {
+                    // navigationTitle must sit on the stack's content: applied
+                    // to the NavigationStack container it never reaches the bar.
                     SeatingWorkspaceView()
+                        .navigationTitle(model.event?.title ?? "Seat Weave")
                 }
-                .navigationTitle(model.event?.title ?? "Seat Weave")
             } else {
                 NavigationStack {
                     EventListView()
