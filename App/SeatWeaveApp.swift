@@ -25,6 +25,7 @@ struct RootView: View {
                 NavigationStack {
                     SeatingWorkspaceView()
                 }
+                .navigationTitle(model.event?.title ?? "Seat Weave")
             } else {
                 NavigationStack {
                     EventListView()

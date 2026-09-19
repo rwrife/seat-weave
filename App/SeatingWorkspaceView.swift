@@ -36,30 +36,11 @@ struct SeatingWorkspaceView: View {
     }
 }
 
-/// Title and shared Undo/Close toolbar, applied per tab because toolbars
-/// attach to the active tab's navigation item, not the TabView itself.
-struct WorkspaceChrome: ViewModifier {
-    @Environment(AppModel.self) private var model
-
-    func body(content: Content) -> some View {
-        content
-            .navigationTitle(model.event?.title ?? "Seat Weave")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Undo") { model.undo() }
-                        .disabled(!model.canUndo)
-                        .accessibilityIdentifier("undo-button")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { model.closeEvent() }
-                        .accessibilityIdentifier("close-event-button")
-                }
-            }
-    }
-}
-
 /// Status rows repeated on every tab so the banner, selected plan and
-/// current selection read identically from any screen.
+/// session controls read identically from any screen. Undo/Close live in
+/// the first visible section instead of a toolbar: toolbar items do not
+/// reliably merge through a TabView, and visible buttons work for VoiceOver,
+/// Switch Control and XCUITest alike.
 struct WorkspaceStatusSection: View {
     @Environment(AppModel.self) private var model
 
@@ -71,6 +52,13 @@ struct WorkspaceStatusSection: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("selected-plan")
+        HStack(spacing: 12) {
+            Button("Undo") { model.undo() }
+                .disabled(!model.canUndo)
+                .accessibilityIdentifier("undo-button")
+            Button("Close event") { model.closeEvent() }
+                .accessibilityIdentifier("close-event-button")
+        }
     }
 }
 
@@ -118,7 +106,6 @@ struct GuestsTab: View {
             }
         }
         .modifier(FailureAlertModifier())
-        .modifier(WorkspaceChrome())
     }
 
     @ViewBuilder
@@ -213,7 +200,6 @@ struct TablesTab: View {
             ResizePlanSheet(tableID: box.tableID) { pendingResizeTableID = nil }
         }
         .modifier(FailureAlertModifier())
-        .modifier(WorkspaceChrome())
     }
 
     private struct ResizeBox: Identifiable {
@@ -304,7 +290,6 @@ struct PairsTab: View {
             }
         }
         .modifier(FailureAlertModifier())
-        .modifier(WorkspaceChrome())
     }
 
     @ViewBuilder
@@ -396,7 +381,6 @@ struct PlansTab: View {
             }
         }
         .modifier(FailureAlertModifier())
-        .modifier(WorkspaceChrome())
     }
 
     @ViewBuilder
