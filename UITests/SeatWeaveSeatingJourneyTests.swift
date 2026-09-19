@@ -24,13 +24,16 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
     }
 
     /// Polls until the element's accessibility label contains the text.
+    /// Checks existence first: reading `.label` on a momentarily absent
+    /// element (SwiftUI rebuilds the List rows after each state change)
+    /// throws a snapshot failure instead of polling.
     private func waitLabel(_ element: XCUIElement, containing text: String, timeout: TimeInterval = 8) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if element.label.contains(text) { return true }
+            if element.exists, element.label.contains(text) { return true }
             _ = element.waitForExistence(timeout: 0.25)
         }
-        return element.label.contains(text)
+        return element.exists && element.label.contains(text)
     }
 
     /// SwiftUI sometimes exposes an identified Text as a cell-like element
