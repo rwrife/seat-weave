@@ -52,7 +52,10 @@ struct WorkspaceStatusSection: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("selected-plan")
-        HStack(spacing: 12) {
+        // Stacked as separate rows: Undo (routine) and Close event
+        // (ends the session) must not share a tap band, or a tap landing
+        // between them during a sheet-dismiss relayout can close the event.
+        VStack(alignment: .leading, spacing: 12) {
             Button("Undo") { model.undo() }
                 .disabled(!model.canUndo)
                 .accessibilityIdentifier("undo-button")

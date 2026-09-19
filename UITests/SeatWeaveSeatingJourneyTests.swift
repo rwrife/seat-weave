@@ -36,6 +36,17 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         return element.exists && element.label.contains(text)
     }
 
+    /// Polls until an element is gone. Sheet/menu dismissal animations
+    /// leave stale hit targets for a moment; tapping other controls during
+    /// that window can land on neighbouring buttons (Undo vs Close event).
+    private func waitGone(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while element.exists, Date() < deadline {
+            _ = element.waitForExistence(timeout: 0.25)
+        }
+        return !element.exists
+    }
+
     /// SwiftUI sometimes exposes an identified Text as a cell-like element
     /// instead of a static text. Accept either representation.
     private func waitIdentifiedLabel(
@@ -113,6 +124,10 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         )
         XCTAssertTrue(explanation.element(boundBy: 0).waitForExistence(timeout: 5))
         app.buttons["confirm-swap"].tap()
+        // Let the sheet finish dismissing before tapping anything else:
+        // during the dismissal animation a synthesized tap can resolve to
+        // a neighbour of the intended control.
+        XCTAssertTrue(waitGone(app.staticTexts["Swap seats?"]))
 
         // After the swap Aster holds seat 2 and Basil holds seat 1.
         XCTAssertTrue(waitLabel(app.buttons["seat-Round1-2"], containing: "Aster"))
