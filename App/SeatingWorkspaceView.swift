@@ -23,45 +23,56 @@ struct SeatingWorkspaceView: View {
     }
 
     var body: some View {
-        TabView {
-            GuestsTab()
-                .tabItem { Label("Guests", systemImage: "person.2") }
-            TablesTab()
-                .tabItem { Label("Tables", systemImage: "circle.grid.circle") }
-            PairsTab()
-                .tabItem { Label("Pairs", systemImage: "heart.text.square") }
-            PlansTab()
-                .tabItem { Label("Plans", systemImage: "square.on.square.dashed") }
+        VStack(spacing: 0) {
+            SessionControlBar()
+            Divider()
+            TabView {
+                GuestsTab()
+                    .tabItem { Label("Guests", systemImage: "person.2") }
+                TablesTab()
+                    .tabItem { Label("Tables", systemImage: "circle.grid.circle") }
+                PairsTab()
+                    .tabItem { Label("Pairs", systemImage: "heart.text.square") }
+                PlansTab()
+                    .tabItem { Label("Plans", systemImage: "square.on.square.dashed") }
+            }
         }
     }
 }
 
-/// Status rows repeated on every tab so the banner, selected plan and
-/// session controls read identically from any screen. Undo/Close live in
-/// the first visible section instead of a toolbar: toolbar items do not
-/// reliably merge through a TabView, and visible buttons work for VoiceOver,
-/// Switch Control and XCUITest alike.
-struct WorkspaceStatusSection: View {
+/// Banner, selected plan and session controls, rendered exactly ONCE
+/// above the TabView. They used to be a List section on every tab; that
+/// put four same-identifier copies of Undo/Close under the TabView, and
+/// the UI journey's undo tap resolved against a hidden tab's copy while
+/// the synthesized event landed on the front tab's Close event button
+/// (run 35420470196: the app popped to the Events list mid-journey).
+/// A single instance outside any List also cannot shift under sheet
+/// dismissal or per-tab scrolling, so a resolved frame stays true at
+/// synthesis time. Visible buttons still work for VoiceOver, Switch
+/// Control and XCUITest alike.
+struct SessionControlBar: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Text(model.bannerText)
-            .font(.callout.weight(.semibold))
-            .accessibilityIdentifier("seating.summary")
-        Text("Plan: \(model.selectedVariant?.name ?? "none")")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .accessibilityIdentifier("selected-plan")
-        // Stacked as separate rows: Undo (routine) and Close event
-        // (ends the session) must not share a tap band, or a tap landing
-        // between them during a sheet-dismiss relayout can close the event.
-        VStack(alignment: .leading, spacing: 12) {
-            Button("Undo") { model.undo() }
-                .disabled(!model.canUndo)
-                .accessibilityIdentifier("undo-button")
-            Button("Close event") { model.closeEvent() }
-                .accessibilityIdentifier("close-event-button")
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.bannerText)
+                .font(.callout.weight(.semibold))
+                .accessibilityIdentifier("seating.summary")
+            HStack {
+                Text("Plan: \(model.selectedVariant?.name ?? "none")")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("selected-plan")
+                Spacer()
+                Button("Undo") { model.undo() }
+                    .disabled(!model.canUndo)
+                    .accessibilityIdentifier("undo-button")
+                Button("Close event", role: .destructive) { model.closeEvent() }
+                    .accessibilityIdentifier("close-event-button")
+            }
         }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
     }
 }
 
@@ -73,7 +84,7 @@ struct GuestsTab: View {
 
     var body: some View {
         List {
-            Section { WorkspaceStatusSection() }
+
             if let event = model.event {
                 Section("Selected guest") {
                     if let guestID = model.selectedGuestID, let guest = event.guest(guestID) {
@@ -166,7 +177,7 @@ struct TablesTab: View {
 
     var body: some View {
         List {
-            Section { WorkspaceStatusSection() }
+
             if let event = model.event, let variant = model.selectedVariant {
                 if model.selectedGuestID != nil {
                     Section {
@@ -285,7 +296,7 @@ struct PairsTab: View {
 
     var body: some View {
         List {
-            Section { WorkspaceStatusSection() }
+
             if let event = model.event, let variant = model.selectedVariant {
                 Section("Pair preferences") {
                     preferencesAndWarnings(event: event, variant: variant)
@@ -367,7 +378,7 @@ struct PlansTab: View {
 
     var body: some View {
         List {
-            Section { WorkspaceStatusSection() }
+
             Section("Compare plans") {
                 ForEach(model.allVariantSummaries(), id: \.variantID) { summary in
                     variantRow(summary)

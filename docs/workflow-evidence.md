@@ -61,6 +61,32 @@ macOS CI (required gate, pinned Xcode 26.0.1 build 17A400, iOS SDK 26.0):
   workspace and the accessibility VoiceOver/Dynamic Type evidence matrix
   are issue #4 scope.
 - Export, backup and deletion-of-everything remain issue #5 scope.
-- Linux cannot build SwiftUI; app-layer compile validation happens in
-  the pinned macOS CI, and no simulator result is claimed until CI
-  actually reports one.
+- Linux cannot build SwiftUI; app-layer compile validation happens in the
+  pinned macOS CI, and no simulator result is claimed until CI actually
+  reports one.
+
+## CI repairs (run + diagnosis + fix, so later lanes don't re-diagnose)
+
+- Run 35420470196 (head `5b37bab`) — `testCompactSeatingJourney` failed
+  at the post-swap `undo-button` tap: `seat-Round1-1` never reappeared.
+  Diagnosis from the run's uploaded artifact (attachments inside
+  `tests.xcresult/Data/`, zstd-decompressed on Linux): the tap log shows
+  `undo-button` resolved at `{{32.0, 211.5}, {41.5, 20.5}}` and
+  synthesized without error, but the debug hierarchy snapshots collected
+  during the failing poll show the app back on the **Events root screen**
+  (NavigationBar `Events`, `open-event-Synthetic dinner`,
+  `create-event-button`). The synthesized event had landed on
+  **Close event**, not Undo. Root cause: the status section (Undo +
+  Close event) was repeated inside a List section on all four tabs, so
+  the hierarchy held four same-identifier copies stacked under the
+  TabView; XCUITest's first-match resolution picked a hidden tab's copy
+  whose y-offset differed from the front tab's after the swap-sheet
+  dismissal relayout. Earlier fixes (12pt stack spacing, sheet-dismiss
+  wait) could not address duplicate identifiers + stale coordinates.
+- Fix (this head): session controls moved out of the per-tab List
+  sections into a single `SessionControlBar` rendered exactly once above
+  the `TabView` in `SeatingWorkspaceView`, so each identifier
+  (`seating.summary`, `selected-plan`, `undo-button`,
+  `close-event-button`) exists exactly once, outside any List, and its
+  frame cannot move under sheet dismissal or per-tab scrolling.
+  `Close event` additionally carries `role: .destructive`.
