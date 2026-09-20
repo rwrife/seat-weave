@@ -106,6 +106,29 @@ public struct EventStore {
         }
     }
 
+    /// Every stored event, most recently updated first. A snapshot that
+    /// cannot be decoded fails explicitly rather than being skipped.
+    public func allEvents() throws -> [SeatingEvent] {
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<StoredEvent>(
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        let records: [StoredEvent]
+        do {
+            records = try context.fetch(descriptor)
+        } catch {
+            throw StoreError.loadFailed(underlying: error)
+        }
+        let decoder = JSONDecoder()
+        return try records.map { record in
+            do {
+                return try decoder.decode(SeatingEvent.self, from: record.snapshot)
+            } catch {
+                throw StoreError.snapshotInvalid
+            }
+        }
+    }
+
     public func eventCount() throws -> Int {
         let context = ModelContext(container)
         do {

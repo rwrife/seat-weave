@@ -69,5 +69,21 @@ struct EventStoreTests {
             _ = try store.load(eventID: id)
         }
     }
+
+    @Test("allEvents lists every stored event or fails explicitly")
+    func allEventsListsEverything() throws {
+        let store = try EventStore.makeTemporaryStore()
+        #expect(try store.allEvents().isEmpty)
+        let (first, _) = sampleEvent()
+        let (second, _) = sampleEvent()
+        try store.save(first)
+        try store.save(second)
+        let listed = try store.allEvents()
+        #expect(Set(listed.map(\.id)) == Set([first.id, second.id]))
+        try store.saveCorruptSnapshot(eventID: UUID())
+        #expect(throws: EventStore.StoreError.self) {
+            _ = try store.allEvents()
+        }
+    }
 }
 #endif

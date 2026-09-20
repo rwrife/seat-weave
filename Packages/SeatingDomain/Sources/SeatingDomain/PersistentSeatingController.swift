@@ -30,6 +30,17 @@ public struct PersistentSeatingController {
     }
 
     public var currentEvent: SeatingEvent { commands.currentEvent }
+    public var canUndo: Bool { commands.canUndo }
+
+    /// Read-through previews for destructive-edit confirmation sheets, so
+    /// the UI never needs a raw `SeatingCommands` handle.
+    public func guestDeletionPreview(guestID: UUID) throws -> SeatingCommands.GuestDeletionPreview {
+        try commands.guestDeletionPreview(guestID: guestID)
+    }
+
+    public func resizePreview(variantID: UUID, tableID: UUID, newSeatCount: Int) throws -> TableResizePreview {
+        try commands.resizePreview(variantID: variantID, tableID: tableID, newSeatCount: newSeatCount)
+    }
 
     /// Run one mutation: validate + apply on a copy, persist, adopt. On any
     /// failure the previous state remains current.

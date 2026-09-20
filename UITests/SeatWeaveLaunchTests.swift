@@ -6,13 +6,14 @@ final class SeatWeaveLaunchTests: XCTestCase {
     }
 
     @MainActor
-    func testBootstrapHomeLaunches() throws {
+    func testFreshLaunchShowsEventList() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"]
+        app.launchArguments = ["-ui-testing", "-resetStore", "YES"]
         app.launch()
 
-        XCTAssertTrue(app.otherElements["bootstrap.home"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Seat Weave"].exists)
-        XCTAssertTrue(app.staticTexts["Event setup and seating tools arrive in the next milestones."].exists)
+        // A fresh install opens on the local event list, not a workspace.
+        XCTAssertTrue(app.staticTexts["Create a gathering"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["event-title-field"].exists)
+        XCTAssertTrue(app.buttons["create-event-button"].exists)
     }
 }
