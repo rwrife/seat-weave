@@ -44,6 +44,13 @@ final class AppModel {
     var event: SeatingEvent? { controller?.currentEvent }
     var canUndo: Bool { controller?.canUndo ?? false }
 
+    /// A validated backup waiting for the host's explicit import (issue #5).
+    struct PendingRestore {
+        let event: SeatingEvent
+        let summary: SeatingBackup.RestoreSummary
+    }
+    var pendingRestore: PendingRestore?
+
     var selectedVariant: PlanVariant? {
         guard let event, let selectedVariantID else { return nil }
         return event.variant(selectedVariantID)
@@ -193,6 +200,107 @@ final class AppModel {
         } catch {
             alertMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Backup, export, restore and deletion (issue #5)
+
+    /// Preview of the guest-facing list for the currently selected plan.
+    /// Nil (plus an alert) when the selection is missing or broken; the
+    /// returned warnings never enter the shared text.
+    func exportSelectedPlan() -> PublicExportPreview? {
+        guard let event, let selectedVariantID else {
+            alertMessage = "No plan selected"
+            return nil
+        }
+        do {
+            return try PublicExportBuilder.preview(event: event, variantID: selectedVariantID)
+        } catch {
+            alertMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Full private backup of the open event. The UI must present the
+    /// privacy warning (BackupSheet) before offering this data.
+    func fullBackupData() -> Data? {
+        guard let event else {
+            alertMessage = "No event is open."
+            return nil
+        }
+        do {
+            return try SeatingBackup.encodeBackup(of: event)
+        } catch {
+            alertMessage = "Backup failed: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// Validates a picked backup WITHOUT touching the store. On success it
+    /// only stages `pendingRestore`; nothing is written until commitRestore.
+    func validateRestore(_ data: Data) {
+        do {
+            let (event, summary) = try SeatingBackup.decodeBackup(data)
+            pendingRestore = PendingRestore(event: event, summary: summary)
+        } catch {
+            pendingRestore = nil
+            alertMessage = "Import rejected: \(error.localizedDescription)"
+        }
+    }
+
+    /// Writes the staged backup as a brand-new event. Never merges with or
+    /// overwrites an existing event; failures leave the store untouched.
+    func commitRestore() {
+        guard let store, let pending = pendingRestore else { return }
+        do {
+            try store.save(pending.event)
+            pendingRestore = nil
+            refreshEventList()
+            alertMessage = "Imported '\(pending.summary.title)' as a new event."
+        } catch {
+            alertMessage = "Import failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Deletes one event after UI confirmation. An open controller on that
+    /// event is closed first; the remembered-launch keys are cleared.
+    func deleteEvent(id: UUID) {
+        guard let store else {
+            alertMessage = "Local storage is unavailable."
+            return
+        }
+        if event?.id == id { closeEvent() }
+        do {
+            try store.delete(eventID: id)
+            clearLaunchKeys(eventID: id)
+            refreshEventList()
+        } catch {
+            alertMessage = "Delete failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Deletes every stored event after UI confirmation.
+    func deleteAllEvents() {
+        guard let store else {
+            alertMessage = "Local storage is unavailable."
+            return
+        }
+        closeEvent()
+        do {
+            try store.deleteAll()
+            defaults.removeObject(forKey: AppModel.lastEventKey)
+            defaults.synchronize()
+            refreshEventList()
+        } catch {
+            alertMessage = "Delete-all failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func clearLaunchKeys(eventID: UUID) {
+        if defaults.string(forKey: AppModel.lastEventKey) == eventID.uuidString {
+            defaults.removeObject(forKey: AppModel.lastEventKey)
+        }
+        defaults.removeObject(forKey: AppModel.lastVariantKey(eventID: eventID))
+        defaults.synchronize()
     }
 
     // MARK: - Derived summaries (compact workspace banner and comparison)

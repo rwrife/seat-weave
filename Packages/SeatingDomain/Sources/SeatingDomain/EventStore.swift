@@ -137,6 +137,34 @@ public struct EventStore {
             throw StoreError.loadFailed(underlying: error)
         }
     }
+
+    /// Permanently removes one event and its snapshot. Confirmed by the
+    /// UI before calling; copies outside the app are beyond reach.
+    public func delete(eventID: UUID) throws {
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<StoredEvent>(predicate: #Predicate { $0.eventID == eventID })
+        do {
+            for record in try context.fetch(descriptor) {
+                context.delete(record)
+            }
+            try context.save()
+        } catch {
+            throw StoreError.saveFailed(underlying: error)
+        }
+    }
+
+    /// Permanently removes every stored event (delete-all, UI-confirmed).
+    public func deleteAll() throws {
+        let context = ModelContext(container)
+        do {
+            for record in try context.fetch(FetchDescriptor<StoredEvent>()) {
+                context.delete(record)
+            }
+            try context.save()
+        } catch {
+            throw StoreError.saveFailed(underlying: error)
+        }
+    }
 }
 
 extension EventStore {

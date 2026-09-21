@@ -85,5 +85,33 @@ struct EventStoreTests {
             _ = try store.allEvents()
         }
     }
+
+    @Test("Deleting one event removes only that event")
+    func deleteOneEvent() throws {
+        let store = try EventStore.makeTemporaryStore()
+        let (first, _) = sampleEvent()
+        let (second, _) = sampleEvent()
+        try store.save(first)
+        try store.save(second)
+        try store.delete(eventID: first.id)
+        #expect(try store.eventCount() == 1)
+        #expect(try store.load(eventID: first.id) == nil)
+        #expect(try store.load(eventID: second.id) == second)
+        // Deleting an already-absent ID is a no-op, not an error.
+        try store.delete(eventID: first.id)
+        #expect(try store.eventCount() == 1)
+    }
+
+    @Test("Delete-all empties the store")
+    func deleteAllEmptiesStore() throws {
+        let store = try EventStore.makeTemporaryStore()
+        let (first, _) = sampleEvent()
+        let (second, _) = sampleEvent()
+        try store.save(first)
+        try store.save(second)
+        try store.deleteAll()
+        #expect(try store.eventCount() == 0)
+        #expect(try store.allEvents().isEmpty)
+    }
 }
 #endif
