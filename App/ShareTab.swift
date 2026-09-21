@@ -21,7 +21,16 @@ struct ShareTab: View {
 
     @State private var previewBox: PreviewBox?
     @State private var showBackupSheet = false
-    @State private var exporting: ExportKind?
+    /// Fully built export waiting for the system save panel. The
+    /// single-document `fileExporter` overload is the only one that
+    /// supports `defaultFilename` on the iOS 26 SDK, so the document,
+    /// content type and filename are prepared together before presenting.
+    private struct PendingExport {
+        let document: SharedFileDocument
+        let contentType: UTType
+        let filename: String
+    }
+    @State private var pendingExport: PendingExport?
     @State private var showRestorePicker = false
     @State private var showConfirmDeleteEvent = false
     @State private var showConfirmDeleteAll = false
@@ -78,20 +87,25 @@ struct ShareTab: View {
             }
         }
         .sheet(item: $previewBox) { box in
-            ExportPreviewSheet(preview: box.preview) { kind in exporting = kind }
+            ExportPreviewSheet(preview: box.preview) { kind in
+                // Build the export while the preview still exists, then let
+                // the preview sheet go away so the system panel can present.
+                startExport(kind)
+                previewBox = nil
+            }
         }
         .sheet(isPresented: $showBackupSheet) {
             BackupSheet {
+                startExport(.backupJSON)
                 showBackupSheet = false
-                exporting = .backupJSON
             }
         }
         .fileExporter(
-            isPresented: Binding(get: { exporting != nil },
-                                 set: { if !$0 { exporting = nil } }),
-            documents: exporterDocuments(),
-            contentTypes: exporterContentTypes(),
-            defaultFilename: suggestedFilename(),
+            isPresented: Binding(get: { pendingExport != nil },
+                                 set: { if !$0 { pendingExport = nil } }),
+            document: pendingExport?.document,
+            contentType: pendingExport?.contentType ?? .data,
+            defaultFilename: pendingExport?.filename ?? "seat-weave",
             onCompletion: { result in
                 switch result {
                 case .success:
@@ -99,7 +113,7 @@ struct ShareTab: View {
                 case .failure(let error):
                     model.alertMessage = "Export failed: \(error.localizedDescription)"
                 }
-                exporting = nil
+                pendingExport = nil
             }
         )
         .fileImporter(isPresented: $showRestorePicker,
@@ -128,39 +142,34 @@ struct ShareTab: View {
 
     // MARK: - Exporter plumbing
 
-    private func suggestedFilename() -> String {
+    /// Builds the requested export NOW (preview/backup data still on hand)
+    /// and stages it for the system save panel.
+    private func startExport(_ kind: ExportKind) {
+        let filename = suggestedFilename(for: kind)
+        switch kind {
+        case .text:
+            guard let text = previewBox?.preview.text.data(using: .utf8) else { return }
+            pendingExport = PendingExport(document: SharedFileDocument(data: text),
+                                          contentType: .plainText, filename: filename)
+        case .pdf:
+            guard let preview = previewBox?.preview else { return }
+            pendingExport = PendingExport(document: SharedFileDocument(data: SeatingPDFRenderer.render(preview.export)),
+                                          contentType: .pdf, filename: filename)
+        case .backupJSON:
+            guard let data = model.fullBackupData() else { return }
+            pendingExport = PendingExport(document: SharedFileDocument(data: data),
+                                          contentType: .json, filename: filename)
+        }
+    }
+
+    private func suggestedFilename(for kind: ExportKind) -> String {
         let base = model.event?.title
             .replacingOccurrences(of: "/", with: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? "seat-weave"
-        switch exporting {
+        switch kind {
         case .pdf: return "\(base)-seating.pdf"
         case .backupJSON: return "\(base)-backup.json"
-        default: return "\(base)-seating.txt"
-        }
-    }
-
-    private func exporterDocuments() -> [SharedFileDocument] {
-        switch exporting {
-        case .text:
-            guard let text = previewBox?.preview.text.data(using: .utf8) else { return [] }
-            return [SharedFileDocument(data: text)]
-        case .pdf:
-            guard let preview = previewBox?.preview else { return [] }
-            return [SharedFileDocument(data: SeatingPDFRenderer.render(preview.export))]
-        case .backupJSON:
-            guard let data = model.fullBackupData() else { return [] }
-            return [SharedFileDocument(data: data)]
-        case nil:
-            return []
-        }
-    }
-
-    private func exporterContentTypes() -> [UTType] {
-        switch exporting {
-        case .text: return [.plainText]
-        case .pdf: return [.pdf]
-        case .backupJSON: return [.json]
-        case nil: return []
+        case .text: return "\(base)-seating.txt"
         }
     }
 
