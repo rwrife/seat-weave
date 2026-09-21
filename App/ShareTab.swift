@@ -165,7 +165,7 @@ struct ShareTab: View {
     }
 
     private func handleRestorePick(_ result: Result<[URL], Error>) {
-        guard case .success(let urls), let url = urls.first else {
+        guard case .success(let urls) = result, let url = urls.first else {
             if case .failure(let error) = result {
                 model.alertMessage = "Could not open that file: \(error.localizedDescription)"
             }
