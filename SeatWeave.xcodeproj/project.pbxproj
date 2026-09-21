@@ -12,6 +12,8 @@
 		A10000000000000000000107 /* SeatingWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000208 /* SeatingWorkspaceView.swift */; };
 		A10000000000000000000108 /* WorkspaceSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000209 /* WorkspaceSheets.swift */; };
 		A10000000000000000000109 /* SeatWeaveSeatingJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */; };
+		A1000000000000000000010A /* ShareTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020A /* ShareTab.swift */; };
+		A1000000000000000000010B /* SeatWeaveShareJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020B /* SeatWeaveShareJourneyTests.swift */; };
 		A10000000000000000000103 /* SeatWeaveLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* SeatWeaveLaunchTests.swift */; };
 		A10000000000000000000104 /* SeatingDomain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000801 /* SeatingDomain */; };
 		A10000000000000000000105 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000206 /* Assets.xcassets */; };
@@ -33,6 +35,8 @@
 		A10000000000000000000207 /* EventListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventListView.swift; sourceTree = "<group>"; };
 		A10000000000000000000208 /* SeatingWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatingWorkspaceView.swift; sourceTree = "<group>"; };
 		A10000000000000000000209 /* WorkspaceSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSheets.swift; sourceTree = "<group>"; };
+		A1000000000000000000020A /* ShareTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareTab.swift; sourceTree = "<group>"; };
+		A1000000000000000000020B /* SeatWeaveShareJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveShareJourneyTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveSeatingJourneyTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000203 /* SeatWeaveLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveLaunchTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000204 /* SeatWeave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeatWeave.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -74,6 +78,7 @@
 				A10000000000000000000207 /* EventListView.swift */,
 				A10000000000000000000208 /* SeatingWorkspaceView.swift */,
 				A10000000000000000000209 /* WorkspaceSheets.swift */,
+				A1000000000000000000020A /* ShareTab.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -83,6 +88,7 @@
 			children = (
 				A10000000000000000000203 /* SeatWeaveLaunchTests.swift */,
 				A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */,
+				A1000000000000000000020B /* SeatWeaveShareJourneyTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -178,6 +184,7 @@
 				A10000000000000000000106 /* EventListView.swift in Sources */,
 				A10000000000000000000107 /* SeatingWorkspaceView.swift in Sources */,
 				A10000000000000000000108 /* WorkspaceSheets.swift in Sources */,
+				A1000000000000000000010A /* ShareTab.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -187,6 +194,7 @@
 			files = (
 				A10000000000000000000103 /* SeatWeaveLaunchTests.swift in Sources */,
 				A10000000000000000000109 /* SeatWeaveSeatingJourneyTests.swift in Sources */,
+				A1000000000000000000010B /* SeatWeaveShareJourneyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

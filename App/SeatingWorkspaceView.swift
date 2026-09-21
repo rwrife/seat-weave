@@ -35,6 +35,8 @@ struct SeatingWorkspaceView: View {
                     .tabItem { Label("Pairs", systemImage: "heart.text.square") }
                 PlansTab()
                     .tabItem { Label("Plans", systemImage: "square.on.square.dashed") }
+                ShareTab()
+                    .tabItem { Label("Share", systemImage: "square.and.arrow.up") }
             }
         }
     }
