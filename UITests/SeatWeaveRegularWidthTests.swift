@@ -39,6 +39,17 @@ final class SeatWeaveRegularWidthTests: XCTestCase {
         return candidates.contains(where: { $0.exists })
     }
 
+    /// Resolve a chart-column tab by identifier regardless of container:
+    /// iPhone renders the TabView as a bottom tab bar, but the iOS 26
+    /// iPad tab bar does not always carry the tab-bar trait (run
+    /// 35695764761: `tabBars.buttons["Tables"]` never resolved on the
+    /// iPad mini destination even though the tab existed).
+    private func chartTab(_ app: XCUIApplication, _ name: String) -> XCUIElement {
+        let inTabBar = app.tabBars.buttons[name]
+        if inTabBar.waitForExistence(timeout: 3) { return inTabBar }
+        return app.buttons[name]
+    }
+
     @MainActor
     func testAutoLayoutPicksRegularRegionOnRegularWidth() throws {
         let app = XCUIApplication()
@@ -71,7 +82,8 @@ final class SeatWeaveRegularWidthTests: XCTestCase {
         field.typeText("Aster\n")
         app.buttons["add-guest-button"].tap()
         XCTAssertTrue(app.buttons["roster-Aster"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.tabBars.buttons["Tables"].waitForExistence(timeout: 5))
+        XCTAssertTrue(chartTab(app, "Tables").waitForExistence(timeout: 8),
+                      "Chart column tabs missing at regular width")
 
         // Rotation at regular width: region choice and any live selection
         // survive orientation changes.
