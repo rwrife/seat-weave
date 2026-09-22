@@ -14,6 +14,9 @@
 		A10000000000000000000109 /* SeatWeaveSeatingJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */; };
 		A1000000000000000000010A /* ShareTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020A /* ShareTab.swift */; };
 		A1000000000000000000010B /* SeatWeaveShareJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020B /* SeatWeaveShareJourneyTests.swift */; };
+		A1000000000000000000010C /* SeatingWorkspaceLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020C /* SeatingWorkspaceLayout.swift */; };
+		A1000000000000000000010D /* SeatWeaveWorkspaceTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */; };
+		A1000000000000000000010E /* SeatWeaveRegularWidthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */; };
 		A10000000000000000000103 /* SeatWeaveLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* SeatWeaveLaunchTests.swift */; };
 		A10000000000000000000104 /* SeatingDomain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000801 /* SeatingDomain */; };
 		A10000000000000000000105 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000206 /* Assets.xcassets */; };
@@ -37,6 +40,9 @@
 		A10000000000000000000209 /* WorkspaceSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSheets.swift; sourceTree = "<group>"; };
 		A1000000000000000000020A /* ShareTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareTab.swift; sourceTree = "<group>"; };
 		A1000000000000000000020B /* SeatWeaveShareJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveShareJourneyTests.swift; sourceTree = "<group>"; };
+		A1000000000000000000020C /* SeatingWorkspaceLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatingWorkspaceLayout.swift; sourceTree = "<group>"; };
+		A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveWorkspaceTransitionTests.swift; sourceTree = "<group>"; };
+		A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveRegularWidthTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveSeatingJourneyTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000203 /* SeatWeaveLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveLaunchTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000204 /* SeatWeave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeatWeave.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,6 +85,7 @@
 				A10000000000000000000208 /* SeatingWorkspaceView.swift */,
 				A10000000000000000000209 /* WorkspaceSheets.swift */,
 				A1000000000000000000020A /* ShareTab.swift */,
+				A1000000000000000000020C /* SeatingWorkspaceLayout.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -89,6 +96,8 @@
 				A10000000000000000000203 /* SeatWeaveLaunchTests.swift */,
 				A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */,
 				A1000000000000000000020B /* SeatWeaveShareJourneyTests.swift */,
+				A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */,
+				A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -185,6 +194,7 @@
 				A10000000000000000000107 /* SeatingWorkspaceView.swift in Sources */,
 				A10000000000000000000108 /* WorkspaceSheets.swift in Sources */,
 				A1000000000000000000010A /* ShareTab.swift in Sources */,
+				A1000000000000000000010C /* SeatingWorkspaceLayout.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -195,6 +205,8 @@
 				A10000000000000000000103 /* SeatWeaveLaunchTests.swift in Sources */,
 				A10000000000000000000109 /* SeatWeaveSeatingJourneyTests.swift in Sources */,
 				A1000000000000000000010B /* SeatWeaveShareJourneyTests.swift in Sources */,
+				A1000000000000000000010D /* SeatWeaveWorkspaceTransitionTests.swift in Sources */,
+				A1000000000000000000010E /* SeatWeaveRegularWidthTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -224,7 +236,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -245,7 +257,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -260,7 +272,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = SeatWeave;
 			};
 			name = Debug;
@@ -276,7 +288,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = SeatWeave;
 			};
 			name = Release;

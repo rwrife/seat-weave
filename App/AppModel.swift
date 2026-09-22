@@ -29,6 +29,9 @@ final class AppModel {
     }
     /// XCTest launch flag: `-resetStore` maps to this argument-domain key.
     static let resetStoreKey = "resetStore"
+    /// XCTest launch flag: `-layoutToggle` shows the workspace-region
+    /// override switch. Normal launches never render it.
+    static let layoutToggleKey = "layoutToggle"
 
     private(set) var events: [SeatingEvent] = []
     private(set) var controller: PersistentSeatingController?
@@ -37,6 +40,13 @@ final class AppModel {
     /// Selected guest lives in app state (not view state) so switching
     /// between the compact Guests/Tables tabs cannot lose the selection.
     var selectedGuestID: UUID?
+    /// Focused table belongs to app state too (PLAN.md): width or
+    /// orientation changes and region switches must not reset it, and
+    /// resizing never mutates assignments or focus.
+    var focusedTableID: UUID?
+    /// UI-test-only workspace-region override. `.auto` follows the
+    /// environment's horizontal size class through `SeatingWorkspaceLayout`.
+    var layoutOverride: WorkspaceLayoutOverride = .auto
 
     private let store: EventStore?
     private let defaults: UserDefaults
@@ -61,14 +71,26 @@ final class AppModel {
         UserDefaults.standard.bool(forKey: resetStoreKey)
     }
 
+    /// Captured at init: whether THIS launch may show the workspace-region
+    /// override switch (launch flag `-layoutToggle YES`).
+    let layoutToggleEnabled: Bool
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        self.layoutToggleEnabled = defaults.bool(forKey: AppModel.layoutToggleKey)
         if AppModel.resetStoreRequested {
             AppModel.wipeStoreDirectory()
             defaults.removeObject(forKey: AppModel.lastEventKey)
             // Launch-argument values can persist in the app domain; clear
             // so a subsequent launch without the flag does not wipe again.
             defaults.removeObject(forKey: AppModel.resetStoreKey)
+            defaults.synchronize()
+        }
+        // Same persistence hazard for the region toggle: tests that want it
+        // pass -layoutToggle YES on every launch; a stale value must not
+        // leak into later launches (or user runs).
+        if layoutToggleEnabled {
+            defaults.removeObject(forKey: AppModel.layoutToggleKey)
             defaults.synchronize()
         }
         self.store = AppModel.makeStore()
@@ -161,6 +183,8 @@ final class AppModel {
         controller = nil
         selectedVariantID = nil
         selectedGuestID = nil
+        focusedTableID = nil
+        layoutOverride = .auto
         refreshEventList()
     }
 

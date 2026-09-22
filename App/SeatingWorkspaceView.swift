@@ -1,14 +1,20 @@
 import SeatingDomain
 import SwiftUI
 
-/// Compact-phone seating workspace per the README: compact widths
-/// *navigate* between guests and seats instead of one endless list.
-/// The guest selection and plan choice live in `AppModel`, so switching
-/// screens cannot lose context. Every operation is a plain tap on a list,
-/// tab or toolbar control; nothing depends on dragging.
+/// Seating workspace root. The region choice (compact tabs vs regular
+/// split workspace) lives entirely in `SeatingWorkspaceLayout`; session
+/// selection (event/variant/guest, table focus) lives in `AppModel`, so
+/// switching regions or rotating the device cannot lose context.
+/// Every operation is a plain tap on a list, tab or toolbar control;
+/// nothing depends on dragging, which keeps VoiceOver, Switch Control
+/// and keyboard navigation complete.
 struct SeatingWorkspaceView: View {
-    @Environment(AppModel.self) private var model
+    var body: some View {
+        SeatingWorkspaceLayout()
+    }
+}
 
+extension SeatingWorkspaceView {
     struct SwapRequest: Identifiable {
         let id = UUID()
         let movingGuestID: UUID
@@ -21,37 +27,18 @@ struct SeatingWorkspaceView: View {
         let id: UUID
         let preview: SeatingCommands.GuestDeletionPreview
     }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            SessionControlBar()
-            Divider()
-            TabView {
-                GuestsTab()
-                    .tabItem { Label("Guests", systemImage: "person.2") }
-                TablesTab()
-                    .tabItem { Label("Tables", systemImage: "circle.grid.circle") }
-                PairsTab()
-                    .tabItem { Label("Pairs", systemImage: "heart.text.square") }
-                PlansTab()
-                    .tabItem { Label("Plans", systemImage: "square.on.square.dashed") }
-                ShareTab()
-                    .tabItem { Label("Share", systemImage: "square.and.arrow.up") }
-            }
-        }
-    }
 }
 
 /// Banner, selected plan and session controls, rendered exactly ONCE
-/// above the TabView. They used to be a List section on every tab; that
-/// put four same-identifier copies of Undo/Close under the TabView, and
-/// the UI journey's undo tap resolved against a hidden tab's copy while
-/// the synthesized event landed on the front tab's Close event button
-/// (run 35420470196: the app popped to the Events list mid-journey).
-/// A single instance outside any List also cannot shift under sheet
-/// dismissal or per-tab scrolling, so a resolved frame stays true at
-/// synthesis time. Visible buttons still work for VoiceOver, Switch
-/// Control and XCUITest alike.
+/// above whichever region `SeatingWorkspaceLayout` picks. They used to be
+/// a List section on every tab; that put four same-identifier copies of
+/// Undo/Close under the TabView, and the UI journey's undo tap resolved
+/// against a hidden tab's copy while the synthesized event landed on the
+/// front tab's Close event button (run 35420470196: the app popped to the
+/// Events list mid-journey). A single instance outside any List also
+/// cannot shift under sheet dismissal or per-tab scrolling, so a resolved
+/// frame stays true at synthesis time. Visible buttons still work for
+/// VoiceOver, Switch Control and XCUITest alike.
 struct SessionControlBar: View {
     @Environment(AppModel.self) private var model
 
@@ -66,6 +53,24 @@ struct SessionControlBar: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("selected-plan")
                 Spacer()
+                if model.layoutToggleEnabled {
+                    // Test-build-only region override (launch flag
+                    // -layoutToggle YES). A plain menu, so the same
+                    // transition a future public dual-screen API would
+                    // drive is exercisable by Switch Control and XCUITest.
+                    // Icon-only to survive 320pt phone widths alongside
+                    // Undo/Close controls.
+                    Menu {
+                        ForEach(WorkspaceLayoutOverride.allCases) { option in
+                            Button(option.rawValue) { model.layoutOverride = option }
+                                .accessibilityIdentifier("layout-region-\(option.rawValue)")
+                        }
+                    } label: {
+                        Image(systemName: "rectangle.split.2x1")
+                    }
+                    .accessibilityIdentifier("layout-region-menu")
+                    .accessibilityLabel("Workspace region")
+                }
                 Button("Undo") { model.undo() }
                     .disabled(!model.canUndo)
                     .accessibilityIdentifier("undo-button")
@@ -78,42 +83,16 @@ struct SessionControlBar: View {
     }
 }
 
-/// Roster screen: alias-capable guest list, selection controls and
-/// previewed destructive deletion.
+/// Roster screen (compact region): alias-capable guest list, selection
+/// controls and previewed destructive deletion. Shares its building blocks
+/// with the regular-width sidebar so both regions behave identically.
 struct GuestsTab: View {
     @Environment(AppModel.self) private var model
     @State private var deletionTarget: SeatingWorkspaceView.DeletionTarget?
 
     var body: some View {
         List {
-
-            if let event = model.event {
-                Section("Selected guest") {
-                    if let guestID = model.selectedGuestID, let guest = event.guest(guestID) {
-                        Text("\(guest.displayName) — \(model.seatLabel(for: guestID))")
-                            .accessibilityIdentifier("selection.current")
-                        Button("Unseat") { unseat(guestID: guestID) }
-                            .accessibilityIdentifier("unseat-button")
-                        Button("Delete guest") { showDeletionSheet(guestID: guestID) }
-                            .accessibilityIdentifier("delete-guest-button")
-                        Button("Clear selection") { model.selectedGuestID = nil }
-                            .accessibilityIdentifier("clear-selection-button")
-                    } else {
-                        Text("Tap a guest to select, then choose a seat on Tables.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Section("Guests") {
-                    ForEach(event.guests, id: \.self) { guest in
-                        rosterRow(guest: guest)
-                    }
-                    if event.guests.isEmpty {
-                        Text("No guests yet. Add the first one below.")
-                            .foregroundStyle(.secondary)
-                    }
-                    AddGuestRow()
-                }
-            }
+            GuestsSectionContent(deletionTarget: $deletionTarget)
         }
         .sheet(item: $deletionTarget) { target in
             DeleteGuestSheet(target: target) {
@@ -122,6 +101,44 @@ struct GuestsTab: View {
             }
         }
         .modifier(FailureAlertModifier())
+    }
+}
+
+/// The three roster sections, shared by the compact Guests tab and the
+/// regular-width sidebar. Selection and deletion state belong to the
+/// content, the sheet host belongs to each region container.
+struct GuestsSectionContent: View {
+    @Environment(AppModel.self) private var model
+    @Binding var deletionTarget: SeatingWorkspaceView.DeletionTarget?
+
+    var body: some View {
+        if let event = model.event {
+            Section("Selected guest") {
+                if let guestID = model.selectedGuestID, let guest = event.guest(guestID) {
+                    Text("\(guest.displayName) — \(model.seatLabel(for: guestID))")
+                        .accessibilityIdentifier("selection.current")
+                    Button("Unseat") { unseat(guestID: guestID) }
+                        .accessibilityIdentifier("unseat-button")
+                    Button("Delete guest") { showDeletionSheet(guestID: guestID) }
+                        .accessibilityIdentifier("delete-guest-button")
+                    Button("Clear selection") { model.selectedGuestID = nil }
+                        .accessibilityIdentifier("clear-selection-button")
+                } else {
+                    Text("Tap a guest to select, then choose a seat on Tables.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section("Guests") {
+                ForEach(event.guests, id: \.self) { guest in
+                    rosterRow(guest: guest)
+                }
+                if event.guests.isEmpty {
+                    Text("No guests yet. Add the first one below.")
+                        .foregroundStyle(.secondary)
+                }
+                AddGuestRow()
+            }
+        }
     }
 
     @ViewBuilder
@@ -146,6 +163,8 @@ struct GuestsTab: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("roster-\(guest.displayName)")
+        // One element, one clear phrase: name first, then current seat.
+        // VoiceOver reads this row as a single item in roster order.
         .accessibilityLabel("\(guest.displayName), \(seatLabel)")
     }
 
@@ -189,7 +208,7 @@ struct TablesTab: View {
                     }
                 }
                 ForEach(variant.tables) { table in
-                    Section(table.label) {
+                    Section {
                         ForEach(1...table.seatCount, id: \.self) { seatNumber in
                             seatRow(table: table, seatNumber: seatNumber, variant: variant, event: event)
                         }
@@ -197,6 +216,15 @@ struct TablesTab: View {
                             pendingResizeTableID = table.id
                         }
                         .accessibilityIdentifier("resize-\(table.label)")
+                    } header: {
+                        HStack {
+                            Text(table.label)
+                            if model.focusedTableID == table.id {
+                                Image(systemName: "target")
+                                    .accessibilityLabel("Focused table")
+                                    .accessibilityIdentifier("focus-\(table.label)")
+                            }
+                        }
                     }
                 }
                 Section {
@@ -249,6 +277,9 @@ struct TablesTab: View {
 
     private func seatTapped(table: SeatingTable, seatNumber: Int, variant: PlanVariant) {
         guard let variantID = model.selectedVariantID else { return }
+        // Table focus is app state (PLAN.md): interacting with a table
+        // focuses it, and no width/orientation/region switch resets it.
+        model.focusedTableID = table.id
         let occupantID = variant.occupant(tableID: table.id, seatNumber: seatNumber)
         guard let guestID = model.selectedGuestID else {
             // No selection: tapping an occupied seat picks up its guest.
@@ -298,18 +329,24 @@ struct PairsTab: View {
 
     var body: some View {
         List {
-
             if let event = model.event, let variant = model.selectedVariant {
                 Section("Pair preferences") {
-                    preferencesAndWarnings(event: event, variant: variant)
+                    PairPreferencesContent(event: event, variant: variant)
                 }
             }
         }
         .modifier(FailureAlertModifier())
     }
+}
+/// Preference review shared by the compact Pairs tab and the regular
+/// sidebar. Status is conveyed by text (reason strings), never color or
+/// icon alone, so contrast and VoiceOver need no special accommodation.
+struct PairPreferencesContent: View {
+    @Environment(AppModel.self) private var model
+    let event: SeatingEvent
+    let variant: PlanVariant
 
-    @ViewBuilder
-    private func preferencesAndWarnings(event: SeatingEvent, variant: PlanVariant) -> some View {
+    var body: some View {
         let evaluations = RuleEngine.evaluate(event: event, variant: variant)
         let notable = evaluations.filter { $0.status != .satisfied }
 
