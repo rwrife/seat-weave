@@ -72,8 +72,15 @@ explicitly NOT performed — see Pending evidence at the bottom.
 
 ## CI repairs
 
-- (first-compile findings recorded here as they happen; initial push
-  pending)
+- Run 35695764761 (head a44932a, iPhone SE 26.0 + iPad mini A17 Pro
+  26.0): every phase through `ui_tests` passed (helpers 25, domain 53,
+  app build, full compact suite incl. the new override-driven
+  WorkspaceTransitionTests). `ui_tests_regular` failed at
+  `tabBars.buttons["Tables"]` (exit 65): the iOS 26 iPad TabView does
+  not expose its chart-column items under a tabBars-trait container.
+  Repair 8b13ae6: `chartTab()` probes `tabBars.buttons` first and falls
+  back to whole-app `buttons` — the same identifier resolves either way;
+  no production-code change.
 
 ## Pending evidence (explicit, not performed)
 
