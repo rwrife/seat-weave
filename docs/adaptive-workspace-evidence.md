@@ -82,10 +82,20 @@ explicitly NOT performed — see Pending evidence at the bottom.
   back to whole-app `buttons` — the same identifier resolves either way;
   no production-code change.
 
+## Native verification (green, this issue's merge gate)
+
+- Run 35697569604 at head 9d2fd93: provenance artifact verified
+  (expected_sha == actual_sha, phase=complete, exit_status=0) on
+  Xcode 26.0.1 (17A400), iOS SDK 26.0, macOS ARM64. Compact suite on
+  iPhone SE (3rd gen, iOS 26.0): 4 tests, 0 failures (Launch,
+  SeatingJourney, ShareJourney, WorkspaceTransition — the override
+  region flips, mid-assignment rotation, and focus-continuity gates).
+  Regular suite on iPad mini (A17 Pro, iOS 26.0): 1 test, 0 failures
+  (auto size-class path, sidebar+chart coexistence, rotation
+  continuity). Simulator evidence only.
+
 ## Pending evidence (explicit, not performed)
 
-- Green macOS CI at this head with BOTH destinations and provenance
-  artifact verification (the merge gate).
 - Human VoiceOver sequence review, Dynamic Type sizes AX1–AX5, contrast
   audit, 44-point hit-target audit, Switch Control and Full Keyboard
   Access sessions: the UI is tap-first and system-standard, but no
