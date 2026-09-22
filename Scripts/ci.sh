@@ -65,6 +65,10 @@ simulator_udid="$(python3 Scripts/select_simulator.py \
   --sdk "$sdk_version" \
   --devices-json-out "$artifact_dir/simulator-devices.json")"
 echo "platform=iOS Simulator,id=$simulator_udid" > "$artifact_dir/destination.txt"
+# Issue #4: a regular-width (iPad-family) destination proves the auto
+# path of SeatingWorkspaceLayout. Fall back to phone-only when no iPad
+# simulator is available and record that honestly.
+regular_udid="$(python3 Scripts/select_simulator.py --sdk "$sdk_version" --family ipad)" || regular_udid=""
 
 phase="simulator_boot"
 python3 Scripts/boot_simulator.py boot \
@@ -92,16 +96,48 @@ xcodebuild build \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-build.log"
 
+# Compact-phone journeys (issue #3/#5) and the override-driven region
+# transitions (issue #4) run on the pinned iPhone destination.
 phase="ui_tests"
 xcodebuild test \
   -project SeatWeave.xcodeproj \
   -scheme SeatWeave \
-  -configuration Debug \
+  -only-testing:SeatWeaveUITests/SeatWeaveLaunchTests \
+  -only-testing:SeatWeaveUITests/SeatWeaveSeatingJourneyTests \
+  -only-testing:SeatWeaveUITests/SeatWeaveShareJourneyTests \
+  -only-testing:SeatWeaveUITests/SeatWeaveWorkspaceTransitionTests \
   -destination "platform=iOS Simulator,id=$simulator_udid" \
   -derivedDataPath "$derived_data" \
-  -resultBundlePath "$artifact_dir/tests.xcresult" \
+  -resultBundlePath "$artifact_dir/tests-compact.xcresult" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
-  2>&1 | tee "$artifact_dir/xcodebuild-test.log"
+  2>&1 | tee "$artifact_dir/xcodebuild-test-compact.log"
+
+# Regular-width evidence (issue #4): the auto region path on an actual
+# regular-size-class destination. No iPad simulator => explicit, honest
+# gap in provenance; the phone results above still gate the merge.
+if [[ -n "$regular_udid" ]]; then
+  echo "platform=iOS Simulator,id=$regular_udid" > "$artifact_dir/destination-regular.txt"
+  python3 Scripts/boot_simulator.py boot \
+    --udid "$regular_udid" \
+    --devices-json "$artifact_dir/simulator-devices.json" \
+    --log "$artifact_dir/simulator-boot-regular.log" \
+    --boot-timeout 120 \
+    --bootstatus-timeout 180 \
+    2> >(tee -a "$artifact_dir/simulator-boot-regular.log" >&2)
+  phase="ui_tests_regular"
+  xcodebuild test \
+    -project SeatWeave.xcodeproj \
+    -scheme SeatWeave \
+    -only-testing:SeatWeaveUITests/SeatWeaveRegularWidthTests \
+    -destination "platform=iOS Simulator,id=$regular_udid" \
+    -derivedDataPath "$derived_data" \
+    -resultBundlePath "$artifact_dir/tests-regular.xcresult" \
+    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_REQUIRED=NO \
+    2>&1 | tee "$artifact_dir/xcodebuild-test-regular.log"
+else
+  echo "no-available-ipad-simulator" > "$artifact_dir/destination-regular.txt"
+fi
 
 phase="complete"
