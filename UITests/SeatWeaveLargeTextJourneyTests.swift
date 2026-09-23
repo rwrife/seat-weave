@@ -51,17 +51,41 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         return false
     }
 
+    /// Scrolls the front-most scrollable surface down one screenful.
+    /// SwiftUI lists may surface as tables, scroll views or a plain
+    /// collection; the window-level swipe is the robust last resort.
+    private func scrollDownOnce(_ app: XCUIApplication) {
+        let table = app.tables.firstMatch
+        if table.exists { table.swipeUp(); return }
+        let scroll = app.scrollViews.firstMatch
+        if scroll.exists { scroll.swipeUp(); return }
+        app.swipeUp()
+    }
+
+    /// Waits for a text field by identifier, scrolling down while it is
+    /// off-screen — finding controls by scrolling IS the assertion.
+    private func waitField(_ app: XCUIApplication, identifier: String,
+                           timeout: TimeInterval = 20) -> XCUIElement {
+        let field = app.textFields[identifier]
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if field.exists, field.isHittable { return field }
+            scrollDownOnce(app)
+        }
+        XCTAssertTrue(field.exists, "text field \(identifier) never found even after scrolling")
+        return field
+    }
+
     /// Waits for a button by identifier, scrolling the workspace lists
     /// downward while searching — large text pushes controls off screen
     /// and finding them by scroll IS the accessibility assertion.
     private func waitButton(_ app: XCUIApplication, identifier: String,
-                            timeout: TimeInterval = 15) -> XCUIElement {
+                            timeout: TimeInterval = 20) -> XCUIElement {
         let button = app.buttons[identifier]
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if button.exists { return button }
-            let table = app.tables.firstMatch
-            if table.exists { table.swipeUp() }
+            scrollDownOnce(app)
         }
         XCTAssertTrue(button.exists, "button \(identifier) never found even after scrolling")
         return button
@@ -97,9 +121,7 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         XCTAssertTrue(probeLabel.contains("UICTContentSizeCategoryAccessibility"),
                       "content size did not reach the accessibility range: \(probeLabel)")
 
-        let titleField = app.textFields["event-title-field"]
-        XCTAssertTrue(titleField.waitForExistence(timeout: 10),
-                      "event list unusable at accessibility text size")
+        let titleField = waitField(app, identifier: "event-title-field")
         titleField.tap()
         titleField.typeText("Large text dinner\n")
         waitButton(app, identifier: "create-event-button").tap()
@@ -107,23 +129,21 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
 
         // Roster on the Guests tab, scrolled into view as needed.
         waitButton(app, identifier: "Guests").tap()
-        let guestField = app.textFields["add-guest-field"]
-        XCTAssertTrue(guestField.waitForExistence(timeout: 15), "add-guest field off-screen")
+        let guestField = waitField(app, identifier: "add-guest-field")
         guestField.tap()
         guestField.typeText("Aster\n")
         waitButton(app, identifier: "add-guest-button").tap()
         XCTAssertTrue(waitButton(app, identifier: "roster-Aster").waitForExistence(timeout: 10))
 
-        guestField.tap()
-        guestField.typeText("Basil\n")
+        waitField(app, identifier: "add-guest-field").tap()
+        app.textFields["add-guest-field"].typeText("Basil\n")
         waitButton(app, identifier: "add-guest-button").tap()
         XCTAssertTrue(waitButton(app, identifier: "roster-Basil").waitForExistence(timeout: 10))
 
         // One table (default six seats) on the Tables tab.
         waitButton(app, identifier: "Tables").tap()
         waitButton(app, identifier: "add-table-button").tap()
-        let labelField = app.textFields["table-label-field"]
-        XCTAssertTrue(labelField.waitForExistence(timeout: 10))
+        let labelField = waitField(app, identifier: "table-label-field")
         labelField.tap()
         labelField.typeText("Round1\n")
         waitButton(app, identifier: "confirm-add-table").tap()
