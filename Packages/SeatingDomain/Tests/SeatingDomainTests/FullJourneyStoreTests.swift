@@ -28,7 +28,7 @@ struct FullJourneyStoreTests {
         var commands = SeatingCommands(event: event)
         let aster = try commands.addGuest(displayName: "Aster")
         let basil = try commands.addGuest(displayName: "Basil")
-        let cleo = try commands.addGuest(displayName: "Cleo")
+        _ = try commands.addGuest(displayName: "Cleo")
         let variantID = commands.currentEvent.variants[0].id
         let table = try commands.addTable(toVariant: variantID, label: "Round1", seatCount: 6)
         _ = try commands.addPreference(firstGuestID: aster.id, secondGuestID: basil.id,
@@ -74,7 +74,7 @@ struct FullJourneyStoreTests {
         let planB = try #require(duplicatedVariantID)
 
         // Persisted state must equal the visible state.
-        #expect(try #require(store.load(eventID: event.id)) == controller.currentEvent)
+        #expect(try #require(try store.load(eventID: event.id)) == controller.currentEvent)
 
         // Export: the public preview of the selected variant excludes
         // Cleo (unseated) and the private adjacency rule.
@@ -88,7 +88,7 @@ struct FullJourneyStoreTests {
         // Relaunch analogue: a fresh store handle + controller reads the
         // committed data back, and the remembered plan survives.
         let reopened = try EventStore.makeFileStore(directory: directory)
-        let reloaded = try #require(reopened.load(eventID: event.id))
+        let reloaded = try #require(try reopened.load(eventID: event.id))
         #expect(reloaded == controller.currentEvent)
         #expect(reloaded.variant(planB) != nil)
 
@@ -100,8 +100,8 @@ struct FullJourneyStoreTests {
         #expect(summary.title == "Journey dinner")
         #expect(summary.preferenceCount == 1)
         try reopened.save(restored)
-        #expect(try #require(reopened.load(eventID: event.id)) == reloaded)
-        let storedRestored = try #require(reopened.load(eventID: restored.id))
+        #expect(try #require(try reopened.load(eventID: event.id)) == reloaded)
+        let storedRestored = try #require(try reopened.load(eventID: restored.id))
         #expect(storedRestored.id != event.id)
         #expect(Set(storedRestored.guests.map(\.displayName))
                 == Set(["Aster", "Basil", "Cleo"]))
