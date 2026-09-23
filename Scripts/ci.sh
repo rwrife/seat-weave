@@ -51,6 +51,14 @@ fi
 phase="helper_tests"
 python3 -m unittest discover -s Scripts/tests -v 2>&1 | tee "$artifact_dir/helper-tests.log"
 
+phase="offline_privacy_audit"
+# Issue #6: static, source-level offline-privacy audit (no network /
+# analytics / CloudKit references, no custom entitlements). This is a
+# static review, not observed network-capture evidence.
+python3 Scripts/entitlement_audit.py \
+  --repo-root "$repo_root" --source-only \
+  --report "$artifact_dir/offline-privacy-audit-source.json"
+
 phase="toolchain_selection"
 python3 Scripts/select_xcode.py \
   --toolchain toolchain.json \
@@ -96,8 +104,10 @@ xcodebuild build \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-build.log"
 
-# Compact-phone journeys (issue #3/#5) and the override-driven region
-# transitions (issue #4) run on the pinned iPhone destination.
+# Compact-phone journeys (issue #3/#5/#6) and the override-driven region
+# transitions (issue #4) run on the pinned iPhone destination. The
+# large-text journey drives the same core flow at the
+# extra-extra-large Dynamic Type size (script-set via `simctl ui`).
 phase="ui_tests"
 xcodebuild test \
   -project SeatWeave.xcodeproj \
@@ -106,6 +116,7 @@ xcodebuild test \
   -only-testing:SeatWeaveUITests/SeatWeaveSeatingJourneyTests \
   -only-testing:SeatWeaveUITests/SeatWeaveShareJourneyTests \
   -only-testing:SeatWeaveUITests/SeatWeaveWorkspaceTransitionTests \
+  -only-testing:SeatWeaveUITests/SeatWeaveLargeTextJourneyTests \
   -destination "platform=iOS Simulator,id=$simulator_udid" \
   -derivedDataPath "$derived_data" \
   -resultBundlePath "$artifact_dir/tests-compact.xcresult" \
