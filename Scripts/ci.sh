@@ -104,10 +104,9 @@ xcodebuild build \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-build.log"
 
-# Compact-phone journeys (issue #3/#5/#6) and the override-driven region
-# transitions (issue #4) run on the pinned iPhone destination. The
-# large-text journey drives the same core flow at the
-# extra-extra-large Dynamic Type size (script-set via `simctl ui`).
+# Compact-phone journeys (issue #3/#5) and the override-driven region
+# transitions (issue #4) run on the pinned iPhone destination at the
+# default content size.
 phase="ui_tests"
 xcodebuild test \
   -project SeatWeave.xcodeproj \
@@ -116,13 +115,46 @@ xcodebuild test \
   -only-testing:SeatWeaveUITests/SeatWeaveSeatingJourneyTests \
   -only-testing:SeatWeaveUITests/SeatWeaveShareJourneyTests \
   -only-testing:SeatWeaveUITests/SeatWeaveWorkspaceTransitionTests \
-  -only-testing:SeatWeaveUITests/SeatWeaveLargeTextJourneyTests \
   -destination "platform=iOS Simulator,id=$simulator_udid" \
   -derivedDataPath "$derived_data" \
   -resultBundlePath "$artifact_dir/tests-compact.xcresult" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-test-compact.log"
+
+# Issue #6 large-text journey: a separate invocation with the
+# destination's content size raised to the accessibility range through
+# `simctl ui` (the scripted equivalent of Settings > Accessibility >
+# Display & Text). The app-side content probe asserts the ACTUAL size
+# the environment resolved, so this suite cannot silently pass at the
+# default size. The size is restored to large immediately afterwards,
+# even on failure, so the regular-width run keeps default metrics.
+phase="ui_tests_large_text"
+set +e
+python3 Scripts/boot_simulator.py capture \
+  --timeout 15 --output "$artifact_dir/content-size-set.log" \
+  -- xcrun simctl ui "$simulator_udid" content_size accessibility-extra-extra-large
+content_size_rc=$?
+set -e
+echo "content_size_set_rc=$content_size_rc" >> "$artifact_dir/content-size-set.log"
+restore_content_size() {
+  python3 Scripts/boot_simulator.py capture \
+    --timeout 15 --output "$artifact_dir/content-size-restore.log" \
+    -- xcrun simctl ui "$simulator_udid" content_size large || true
+}
+trap 'write_provenance; restore_content_size' EXIT
+xcodebuild test \
+  -project SeatWeave.xcodeproj \
+  -scheme SeatWeave \
+  -only-testing:SeatWeaveUITests/SeatWeaveLargeTextJourneyTests \
+  -destination "platform=iOS Simulator,id=$simulator_udid" \
+  -derivedDataPath "$derived_data" \
+  -resultBundlePath "$artifact_dir/tests-large-text.xcresult" \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  2>&1 | tee "$artifact_dir/xcodebuild-test-large-text.log"
+restore_content_size
+trap 'write_provenance' EXIT
 
 # Regular-width evidence (issue #4): the auto region path on an actual
 # regular-size-class destination. No iPad simulator => explicit, honest
