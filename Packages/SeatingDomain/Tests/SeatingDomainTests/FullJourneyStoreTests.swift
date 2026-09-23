@@ -24,7 +24,7 @@ struct FullJourneyStoreTests {
         let saver = StoreSaverForTest(store: store)
 
         // Create: event with roster and one table.
-        let event = SeatingEvent(title: "Journey dinner", variants: [PlanVariant(name: "Plan A")])
+        var event = SeatingEvent(title: "Journey dinner", variants: [PlanVariant(name: "Plan A")])
         var commands = SeatingCommands(event: event)
         let aster = try commands.addGuest(displayName: "Aster")
         let basil = try commands.addGuest(displayName: "Basil")
