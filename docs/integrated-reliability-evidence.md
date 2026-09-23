@@ -42,16 +42,23 @@ Base commit this slice builds on: `04f68a4` (issue #4 merge, main).
    store reopen.
 3. **Large-text accessibility journey (simulator)** — `UITests/
    SeatWeaveLargeTextJourneyTests.swift`, registered in the Xcode
-   project and in `Scripts/ci.sh` compact-destination runs. The test
-   sets the destination content size to `accessibility-extra-extra-large`
-   via `xcrun simctl ui booted content_size` (scripted equivalent of
-   Settings ▸ Accessibility ▸ Display & Text ▸ Larger Text; the test
-   tries the documented and legacy token spellings in order), then walks
-   create → guests → table → assign → swap → undo → **resize (via the
-   sheet stepper, first automated coverage of this control)** →
-   duplicate → relaunch → public export preview, locating controls by
-   scrolling. If the simulator rejects every size spelling the failure
-   is asserted, not swallowed. The content size is restored in teardown.
+   project and run by `Scripts/ci.sh` as its OWN xcodebuild invocation:
+   before it, CI raises the destination content size with
+   `xcrun simctl ui <udid> content_size accessibility-extra-extra-large`
+   (the scripted equivalent of Settings ▸ Accessibility ▸ Display & Text
+   ▸ Larger Text; runner processes cannot spawn xcrun from inside an iOS
+   test, so the setting is applied outside the app) and restores the
+   default size afterwards, even on failure. The app exposes a
+   launch-flag-gated (`-contentProbe YES`, cleared at init so it can
+   never leak into user launches) content-size probe rendering
+   `UIApplication.preferredContentSizeCategory`; the test asserts the
+   environment ACTUALLY reached the accessibility range before walking
+   the journey — a default-size launch fails the gate instead of
+   silently passing. The journey covers create → guests → table →
+   assign → swap → undo → **resize (via the sheet stepper's Decrement
+   control — first automated coverage of this control; the public
+   `decrement()` API does not exist on the pinned SDK)** → duplicate →
+   relaunch → public export preview, locating controls by scrolling.
 4. **Static offline-privacy audit** — `Scripts/entitlement_audit.py` +
    6 helper tests, run as a new `offline_privacy_audit` phase in
    `Scripts/ci.sh` and in this slice's Linux verification. It scans all
