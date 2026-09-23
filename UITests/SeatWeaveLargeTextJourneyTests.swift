@@ -89,15 +89,12 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
 
         // The probe proves the external content-size setting actually
         // took effect; a default-size launch must fail this assertion.
+        // (CI-observed actual value at accessibility-extra-extra-large:
+        // "UICTContentSizeCategoryAccessibilityXXL".)
         let probe = app.staticTexts["content-size-probe"]
         XCTAssertTrue(probe.waitForExistence(timeout: 10), "content-size probe missing")
         let probeLabel = probe.label
-        let axCategories = ["UICTContentSizeCategoryAccessibilityMedium",
-                            "UICTContentSizeCategoryAccessibilityLarge",
-                            "UICTContentSizeCategoryAccessibilityExtraLarge",
-                            "UICTContentSizeCategoryAccessibilityExtraExtraLarge",
-                            "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge"]
-        XCTAssertTrue(axCategories.contains(where: { probeLabel.contains($0) }),
+        XCTAssertTrue(probeLabel.contains("UICTContentSizeCategoryAccessibility"),
                       "content size did not reach the accessibility range: \(probeLabel)")
 
         let titleField = app.textFields["event-title-field"]
