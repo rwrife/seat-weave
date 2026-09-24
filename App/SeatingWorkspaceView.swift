@@ -167,15 +167,24 @@ struct GuestsSectionContent: View {
                         Button {
                             model.rosterFilter = filter
                         } label: {
-                            Text(filter.label)
-                                .frame(maxWidth: .infinity)
+                            // Plain button + checkmark: the repo's
+                            // established selection idiom (roster/seat
+                            // rows); a ternary of two different
+                            // ButtonStyle types does not typecheck.
+                            HStack(spacing: 4) {
+                                Text(filter.label)
+                                if filter == model.rosterFilter {
+                                    Image(systemName: "checkmark.circle.fill")
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(filter == model.rosterFilter ? .borderedProminent : .bordered)
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier("filter-\(filter.rawValue)")
                         .accessibilityLabel("\(filter.label) filter\(filter == model.rosterFilter ? ", selected" : "")")
                     }
                 }
-                .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
             } header: {
                 Text("Filter")
