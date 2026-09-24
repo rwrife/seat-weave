@@ -153,7 +153,43 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         // One last pass without the hittable requirement to produce a
         // precise failure message.
         let element = candidates(app, identifier).first { $0.exists } ?? app.buttons[identifier]
-        XCTAssertTrue(element.isHittable, "\(identifier) never became tappable even after scrolling")
+        if !element.isHittable {
+            // TEMPORARY one-shot evidence dump for the found-but-never-
+            // hittable failure at AX5XL (CI runs 35833292698..35983208010).
+            // Removed in the same PR once the root cause is committed.
+            var lines: [String] = ["DIAG \(identifier) never hittable; deadline expired."]
+            for (name, el) in [
+                ("button", app.buttons[identifier] as XCUIElement),
+                ("cell", app.cells[identifier] as XCUIElement),
+                ("other", app.otherElements[identifier] as XCUIElement),
+            ] {
+                if el.exists {
+                    lines.append("target \(name): frame=\(el.frame) hittable=\(el.isHittable) label=\(el.label.prefix(70))")
+                } else {
+                    lines.append("target \(name): missing")
+                }
+            }
+            let tabBar = app.tabBars.firstMatch
+            lines.append("tabBar exists=\(tabBar.exists) frame=\(tabBar.exists ? tabBar.frame : .zero)")
+            let table = app.tables.firstMatch
+            lines.append("table exists=\(table.exists) frame=\(table.exists ? table.frame : .zero)")
+            for probe in ["seat-Round1-1", "seat-Round1-3", "seat-Round1-4", "seat-Round1-5"] {
+                let b = app.buttons[probe]
+                if b.exists {
+                    lines.append("probe \(probe): frame=\(b.frame) hittable=\(b.isHittable)")
+                } else {
+                    lines.append("probe \(probe): missing")
+                }
+            }
+            let allButtons = app.buttons.allElementsBoundByIndex
+            lines.append("all buttons (\(allButtons.count)):")
+            for b in allButtons.prefix(50) {
+                lines.append("  id=\(b.identifier) label=\(b.label.prefix(40)) frame=\(b.frame) hittable=\(b.isHittable)")
+            }
+            let dump = lines.joined(separator: "\n")
+            NSLog("LARGE-TEXT-DIAG\n%@", dump)
+            XCTFail(dump)
+        }
         element.tap()
     }
 
