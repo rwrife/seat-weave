@@ -45,7 +45,7 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
 
         // Seat only Aster.
         app.tabBars.buttons["Guests"].tap()
-        app.buttons["roster-Aster"].tap()
+        rosterButton(app, "Aster").tap()
         app.tabBars.buttons["Tables"].tap()
         app.buttons["seat-Round1-1"].tap()
         XCTAssertTrue(waitLabel(app.buttons["seat-Round1-1"], containing: "Aster"))
@@ -118,7 +118,7 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         field.tap()
         field.typeText("\(name)\n")
         app.buttons["add-guest-button"].tap()
-        XCTAssertTrue(app.buttons["roster-\(name)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(rosterButton(app, name).waitForExistence(timeout: 5))
     }
 
     private func waitLabel(_ element: XCUIElement, containing text: String, timeout: TimeInterval = 8) -> Bool {
@@ -129,4 +129,15 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         }
         return element.exists && element.label.contains(text)
     }
+
+    /// Issue #17: roster row identifiers are per-guest UUIDs now, so
+    /// journeys locate rows by the leading name in the row's combined
+    /// accessibility label ("<name>, <seat>"). Names in these journeys
+    /// are unique; the new duplicate-name coverage queries per-person
+    /// labels directly in SeatWeaveGuestEditingJourneyTests.
+    private func rosterButton(_ app: XCUIApplication, _ name: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "\(name), "))
+            .firstMatch
+    }
+
 }
