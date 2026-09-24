@@ -87,7 +87,7 @@ struct CompactWorkspaceTabs: View {
 struct RegularWorkspaceSidebar: View {
     @Environment(AppModel.self) private var model
     @State private var deletionTarget: SeatingWorkspaceView.DeletionTarget?
-    @State private var renameTarget: UUID?
+    @State private var renameTarget: RenameGuestBox?
 
     var body: some View {
         List {
@@ -107,8 +107,8 @@ struct RegularWorkspaceSidebar: View {
                 deletionTarget = nil
             }
         }
-        .sheet(item: $renameTarget) { guestID in
-            RenameGuestSheet(guestID: guestID) { renameTarget = nil }
+        .sheet(item: $renameTarget) { box in
+            RenameGuestSheet(guestID: box.id) { renameTarget = nil }
         }
         .modifier(FailureAlertModifier())
     }

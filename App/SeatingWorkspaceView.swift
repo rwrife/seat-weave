@@ -89,7 +89,7 @@ struct SessionControlBar: View {
 struct GuestsTab: View {
     @Environment(AppModel.self) private var model
     @State private var deletionTarget: SeatingWorkspaceView.DeletionTarget?
-    @State private var renameTarget: UUID?
+    @State private var renameTarget: RenameGuestBox?
 
     var body: some View {
         List {
@@ -101,8 +101,8 @@ struct GuestsTab: View {
                 deletionTarget = nil
             }
         }
-        .sheet(item: $renameTarget) { guestID in
-            RenameGuestSheet(guestID: guestID) { renameTarget = nil }
+        .sheet(item: $renameTarget) { box in
+            RenameGuestSheet(guestID: box.id) { renameTarget = nil }
         }
         .modifier(FailureAlertModifier())
     }
@@ -114,7 +114,7 @@ struct GuestsTab: View {
 struct GuestsSectionContent: View {
     @Environment(AppModel.self) private var model
     @Binding var deletionTarget: SeatingWorkspaceView.DeletionTarget?
-    @Binding var renameTarget: UUID?
+    @Binding var renameTarget: RenameGuestBox?
 
     var body: some View {
         if let event = model.event, let variant = model.selectedVariant {
@@ -142,7 +142,7 @@ struct GuestsSectionContent: View {
                     }
                     Button("Unseat") { unseat(guestID: guestID) }
                         .accessibilityIdentifier("unseat-button")
-                    Button("Rename guest") { renameTarget = guestID }
+                    Button("Rename guest") { renameTarget = RenameGuestBox(id: guestID) }
                         .accessibilityIdentifier("rename-guest-button")
                     Button("Delete guest") { showDeletionSheet(guestID: guestID) }
                         .accessibilityIdentifier("delete-guest-button")

@@ -48,6 +48,13 @@ struct AddGuestRow: View {
     }
 }
 
+/// Sheet-host box for rename presentation: `UUID` is not
+/// `Identifiable`, so the sheet(item:) call sites carry this one-field
+/// wrapper (same pattern as `ResizeBox`).
+struct RenameGuestBox: Identifiable {
+    let id: UUID
+}
+
 /// Renames one guest (issue #17). Only the display name changes: the
 /// guest UUID keeps every assignment in every variant and every pair
 /// preference attached. Warns when the new name matches another guest —
