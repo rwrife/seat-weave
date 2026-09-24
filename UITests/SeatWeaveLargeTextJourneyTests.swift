@@ -143,53 +143,27 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
 
     private func tap(_ app: XCUIApplication, identifier: String, scroll: Bool = true) {
         let deadline = Date().addingTimeInterval(25)
+        var attempts = 0
         while Date() < deadline {
             for element in candidates(app, identifier) where element.exists && element.isHittable {
                 element.tap()
                 return
             }
-            if scroll { scrollDownOnce(app) }
+            if scroll {
+                attempts += 1
+                // Evidence run 36019523093: an element that exists but is
+                // momentarily unhittable gets lazily UNLOADED when the
+                // search keeps scrolling down — rows above the viewport
+                // vanish from the hierarchy. Every fourth attempt scrolls
+                // back up so the hunt is direction-robust (same guard
+                // waitAny already used).
+                if attempts % 4 == 0 { scrollUpOnce(app) } else { scrollDownOnce(app) }
+            }
         }
         // One last pass without the hittable requirement to produce a
         // precise failure message.
         let element = candidates(app, identifier).first { $0.exists } ?? app.buttons[identifier]
-        if !element.isHittable {
-            // TEMPORARY one-shot evidence dump for the found-but-never-
-            // hittable failure at AX5XL (CI runs 35833292698..35983208010).
-            // Removed in the same PR once the root cause is committed.
-            var lines: [String] = ["DIAG \(identifier) never hittable; deadline expired."]
-            for (name, el) in [
-                ("button", app.buttons[identifier] as XCUIElement),
-                ("cell", app.cells[identifier] as XCUIElement),
-                ("other", app.otherElements[identifier] as XCUIElement),
-            ] {
-                if el.exists {
-                    lines.append("target \(name): frame=\(el.frame) hittable=\(el.isHittable) label=\(el.label.prefix(70))")
-                } else {
-                    lines.append("target \(name): missing")
-                }
-            }
-            let tabBar = app.tabBars.firstMatch
-            lines.append("tabBar exists=\(tabBar.exists) frame=\(tabBar.exists ? tabBar.frame : .zero)")
-            let table = app.tables.firstMatch
-            lines.append("table exists=\(table.exists) frame=\(table.exists ? table.frame : .zero)")
-            for probe in ["seat-Round1-1", "seat-Round1-3", "seat-Round1-4", "seat-Round1-5"] {
-                let b = app.buttons[probe]
-                if b.exists {
-                    lines.append("probe \(probe): frame=\(b.frame) hittable=\(b.isHittable)")
-                } else {
-                    lines.append("probe \(probe): missing")
-                }
-            }
-            let allButtons = app.buttons.allElementsBoundByIndex
-            lines.append("all buttons (\(allButtons.count)):")
-            for b in allButtons.prefix(50) {
-                lines.append("  id=\(b.identifier) label=\(b.label.prefix(40)) frame=\(b.frame) hittable=\(b.isHittable)")
-            }
-            let dump = lines.joined(separator: "\n")
-            NSLog("LARGE-TEXT-DIAG\n%@", dump)
-            XCTFail(dump)
-        }
+        XCTAssertTrue(element.isHittable, "\(identifier) never became tappable even after scrolling")
         element.tap()
     }
 
