@@ -1,13 +1,17 @@
 // !$*UTF8*$!
 {
 	archiveVersion = 1;
-	classes = {};
-	objectVersion = 77;
+	classes = {
+	};
+	objectVersion = 71;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A10000000000000000000101 /* SeatWeaveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000201 /* SeatWeaveApp.swift */; };
 		A10000000000000000000102 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000202 /* AppModel.swift */; };
+		A10000000000000000000103 /* SeatWeaveLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* SeatWeaveLaunchTests.swift */; };
+		A10000000000000000000104 /* SeatingDomain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000801 /* SeatingDomain */; };
+		A10000000000000000000105 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000206 /* Assets.xcassets */; };
 		A10000000000000000000106 /* EventListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000207 /* EventListView.swift */; };
 		A10000000000000000000107 /* SeatingWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000208 /* SeatingWorkspaceView.swift */; };
 		A10000000000000000000108 /* WorkspaceSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000209 /* WorkspaceSheets.swift */; };
@@ -17,9 +21,6 @@
 		A1000000000000000000010C /* SeatingWorkspaceLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020C /* SeatingWorkspaceLayout.swift */; };
 		A1000000000000000000010D /* SeatWeaveWorkspaceTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */; };
 		A1000000000000000000010E /* SeatWeaveRegularWidthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */; };
-		A10000000000000000000103 /* SeatWeaveLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000203 /* SeatWeaveLaunchTests.swift */; };
-		A10000000000000000000104 /* SeatingDomain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000801 /* SeatingDomain */; };
-		A10000000000000000000105 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000206 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,6 +36,10 @@
 /* Begin PBXFileReference section */
 		A10000000000000000000201 /* SeatWeaveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000202 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000203 /* SeatWeaveLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveLaunchTests.swift; sourceTree = "<group>"; };
+		A10000000000000000000204 /* SeatWeave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeatWeave.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000205 /* SeatWeaveUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeatWeaveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000206 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000000000000000000207 /* EventListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventListView.swift; sourceTree = "<group>"; };
 		A10000000000000000000208 /* SeatingWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatingWorkspaceView.swift; sourceTree = "<group>"; };
 		A10000000000000000000209 /* WorkspaceSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSheets.swift; sourceTree = "<group>"; };
@@ -44,23 +49,22 @@
 		A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveWorkspaceTransitionTests.swift; sourceTree = "<group>"; };
 		A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveRegularWidthTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveSeatingJourneyTests.swift; sourceTree = "<group>"; };
-		A10000000000000000000203 /* SeatWeaveLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveLaunchTests.swift; sourceTree = "<group>"; };
-		A10000000000000000000204 /* SeatWeave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeatWeave.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000205 /* SeatWeaveUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeatWeaveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000206 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A10000000000000000000401 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = (A10000000000000000000104 /* SeatingDomain in Frameworks */,);
+			files = (
+				A10000000000000000000104 /* SeatingDomain in Frameworks */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A10000000000000000000402 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -122,10 +126,14 @@
 				A10000000000000000000401 /* Frameworks */,
 				A10000000000000000000703 /* Resources */,
 			);
-			buildRules = ();
-			dependencies = ();
+			buildRules = (
+			);
+			dependencies = (
+			);
 			name = SeatWeave;
-			packageProductDependencies = (A10000000000000000000801 /* SeatingDomain */,);
+			packageProductDependencies = (
+				A10000000000000000000801 /* SeatingDomain */,
+			);
 			productName = SeatWeave;
 			productReference = A10000000000000000000204 /* SeatWeave.app */;
 			productType = "com.apple.product-type.application";
@@ -138,8 +146,11 @@
 				A10000000000000000000402 /* Frameworks */,
 				A10000000000000000000704 /* Resources */,
 			);
-			buildRules = ();
-			dependencies = (A10000000000000000000302 /* PBXTargetDependency */,);
+			buildRules = (
+			);
+			dependencies = (
+				A10000000000000000000302 /* PBXTargetDependency */,
+			);
 			name = SeatWeaveUITests;
 			productName = SeatWeaveUITests;
 			productReference = A10000000000000000000205 /* SeatWeaveUITests.xctest */;
@@ -155,19 +166,28 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
-					A10000000000000000000001 = {CreatedOnToolsVersion = 26.0;};
-					A10000000000000000000002 = {CreatedOnToolsVersion = 26.0; TestTargetID = A10000000000000000000001;};
+					A10000000000000000000001 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					A10000000000000000000002 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = A10000000000000000000001;
+					};
 				};
 			};
 			buildConfigurationList = A10000000000000000000600 /* Build configuration list for PBXProject "SeatWeave" */;
 			compatibilityVersion = "Xcode 16.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
-			knownRegions = (en, Base,);
+			knownRegions = (
+				en,
+				Base,
+			);
 			mainGroup = A10000000000000000000500;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (A10000000000000000000800 /* XCLocalSwiftPackageReference "Packages/SeatingDomain" */,);
-			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				A10000000000000000000800 /* XCLocalSwiftPackageReference "Packages/SeatingDomain" */,
+			);
 			productRefGroup = A10000000000000000000503 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -179,8 +199,21 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A10000000000000000000703 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000105 /* Assets.xcassets in Resources */,); runOnlyForDeploymentPostprocessing = 0;};
-		A10000000000000000000704 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+		A10000000000000000000703 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000105 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000000000000000000704 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -213,59 +246,95 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A10000000000000000000302 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A10000000000000000000001 /* SeatWeave */; targetProxy = A10000000000000000000301 /* PBXContainerItemProxy */;};
+		A10000000000000000000302 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000001 /* SeatWeave */;
+			targetProxy = A10000000000000000000301 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		A10000000000000000000901 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; ENABLE_USER_SCRIPT_SANDBOXING = YES; IPHONEOS_DEPLOYMENT_TARGET = 26.0; ONLY_ACTIVE_ARCH = YES; SDKROOT = iphoneos; SWIFT_VERSION = 6.0;}; name = Debug;};
-		A10000000000000000000902 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; ENABLE_USER_SCRIPT_SANDBOXING = YES; IPHONEOS_DEPLOYMENT_TARGET = 26.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_VERSION = 6.0;}; name = Release;};
+		A10000000000000000000901 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A10000000000000000000902 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 		A10000000000000000000903 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 1;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ES87W257J;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Seat Weave";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.infinityball.seatweave;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		A10000000000000000000904 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 1;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ES87W257J;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Seat Weave";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.infinityball.seatweave;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
 		A10000000000000000000905 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2ES87W257J;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.infinityball.seatweave.uitests;
@@ -280,8 +349,8 @@
 		A10000000000000000000906 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2ES87W257J;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.infinityball.seatweave.uitests;
@@ -296,17 +365,48 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000000000000000000600 /* Build configuration list for PBXProject "SeatWeave" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000901 /* Debug */, A10000000000000000000902 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
-		A10000000000000000000601 /* Build configuration list for PBXNativeTarget "SeatWeave" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000903 /* Debug */, A10000000000000000000904 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
-		A10000000000000000000602 /* Build configuration list for PBXNativeTarget "SeatWeaveUITests" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000905 /* Debug */, A10000000000000000000906 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		A10000000000000000000600 /* Build configuration list for PBXProject "SeatWeave" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000901 /* Debug */,
+				A10000000000000000000902 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000601 /* Build configuration list for PBXNativeTarget "SeatWeave" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000903 /* Debug */,
+				A10000000000000000000904 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000602 /* Build configuration list for PBXNativeTarget "SeatWeaveUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000905 /* Debug */,
+				A10000000000000000000906 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A10000000000000000000800 /* XCLocalSwiftPackageReference "Packages/SeatingDomain" */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/SeatingDomain;};
+		A10000000000000000000800 /* XCLocalSwiftPackageReference "Packages/SeatingDomain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/SeatingDomain;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A10000000000000000000801 /* SeatingDomain */ = {isa = XCSwiftPackageProductDependency; package = A10000000000000000000800 /* XCLocalSwiftPackageReference "Packages/SeatingDomain" */; productName = SeatingDomain;};
+		A10000000000000000000801 /* SeatingDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000800 /* XCLocalSwiftPackageReference "Packages/SeatingDomain" */;
+			productName = SeatingDomain;
+		};
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A10000000000000000000000 /* Project object */;
