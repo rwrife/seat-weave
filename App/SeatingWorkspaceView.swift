@@ -162,16 +162,18 @@ struct GuestsSectionContent: View {
                 }
             }
             Section {
-                ForEach(GuestRosterQuery.Filter.allCases, id: \.self) { filter in
-                    Button {
-                        model.rosterFilter = filter
-                    } label: {
-                        Text(filter.label)
-                            .frame(maxWidth: .infinity)
+                HStack(spacing: 8) {
+                    ForEach(GuestRosterQuery.Filter.allCases, id: \.self) { filter in
+                        Button {
+                            model.rosterFilter = filter
+                        } label: {
+                            Text(filter.label)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(filter == model.rosterFilter ? .borderedProminent : .bordered)
+                        .accessibilityIdentifier("filter-\(filter.rawValue)")
+                        .accessibilityLabel("\(filter.label) filter\(filter == model.rosterFilter ? ", selected" : "")")
                     }
-                    .buttonStyle(filter == model.rosterFilter ? .borderedProminent : .bordered)
-                    .accessibilityIdentifier("filter-\(filter.rawValue)")
-                    .accessibilityLabel("\(filter.label) filter\(filter == model.rosterFilter ? ", selected" : "")")
                 }
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
