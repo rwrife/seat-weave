@@ -179,19 +179,25 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         tap(app, identifier: name, scroll: false)
     }
 
-    /// Taps a stepper's decrement control (child button labels exposed
-    /// by SwiftUI steppers).
+    /// Taps a stepper's decrement control. Evidence run 36019523093:
+    /// at AX5XL the positional fallback bound to the WRONG child — the
+    /// Increment button (identifier resize-stepper-Increment) was the
+    /// second exposed control — so the decrement is matched strictly by
+    /// identifier/label, and a missing control fails loudly with a
+    /// child dump instead of guessing.
     private func tapDecrement(_ stepper: XCUIElement) {
-        for name in ["Decrement", "decrement"] {
-            let button = stepper.buttons[name]
-            if button.waitForExistence(timeout: 2) {
-                button.tap()
-                return
-            }
+        let dec = stepper.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@",
+                        "decrement", "decrement")
+        ).firstMatch
+        if dec.waitForExistence(timeout: 5) {
+            dec.tap()
+            return
         }
-        let second = stepper.buttons.element(boundBy: 1)
-        XCTAssertTrue(second.exists, "stepper exposes no decrement control")
-        second.tap()
+        let dump = stepper.buttons.allElementsBoundByIndex
+            .map { "id=\($0.identifier) label=\($0.label)" }
+            .joined(separator: " | ")
+        XCTFail("no decrement control among stepper children: \(dump)")
     }
 
     @MainActor
