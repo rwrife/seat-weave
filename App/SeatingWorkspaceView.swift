@@ -161,6 +161,25 @@ struct GuestsSectionContent: View {
                         .accessibilityIdentifier("duplicate-names-banner")
                 }
             }
+            Section("Guests (\(visible.count) of \(event.guests.count))") {
+                ForEach(visible, id: \.self) { guest in
+                    rosterRow(guest: guest, isDuplicate: duplicates.values.contains { $0.contains(guest.id) })
+                }
+                if visible.isEmpty {
+                    Text(event.guests.isEmpty
+                         ? "No guests yet. Add the first one below."
+                         : "No guests match the current search and filter.")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("roster-empty")
+                }
+                AddGuestRow(duplicateNames: GuestRosterQuery.foldedNameSet(in: event))
+            }
+            // Search and filter sit BELOW the roster so the first roster
+            // rows keep the exact viewport position the established
+            // journeys tap without scrolling (CI run 36027041095:
+            // sections inserted above pushed row 1 under the tab bar and
+            // its tap synthesized off-screen). They remain one scroll
+            // away for larger rosters, where they matter most.
             Section {
                 HStack(spacing: 8) {
                     ForEach(GuestRosterQuery.Filter.allCases, id: \.self) { filter in
@@ -208,19 +227,6 @@ struct GuestsSectionContent: View {
                 }
             } header: {
                 Text("Search")
-            }
-            Section("Guests (\(visible.count) of \(event.guests.count))") {
-                ForEach(visible, id: \.self) { guest in
-                    rosterRow(guest: guest, isDuplicate: duplicates.values.contains { $0.contains(guest.id) })
-                }
-                if visible.isEmpty {
-                    Text(event.guests.isEmpty
-                         ? "No guests yet. Add the first one below."
-                         : "No guests match the current search and filter.")
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("roster-empty")
-                }
-                AddGuestRow(duplicateNames: GuestRosterQuery.foldedNameSet(in: event))
             }
         }
     }
