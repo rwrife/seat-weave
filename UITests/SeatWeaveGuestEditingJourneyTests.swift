@@ -41,9 +41,18 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         let candidates = [app.staticTexts[identifier], app.otherElements[identifier]]
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            for element in candidates where element.exists && element.label.contains(text) {
-                return true
+            for element in candidates where element.exists {
+                // Empty `text` means the caller is asserting identity and
+                // existence only. CI run 36031804625's xcresult proved the
+                // warning was present with the expected identifier and full
+                // label, yet repeatedly fetching `label` made this helper
+                // return false. Do not add an irrelevant label dependency to
+                // existence-only assertions.
+                if text.isEmpty || element.label.contains(text) {
+                    return true
+                }
             }
+            _ = candidates[0].waitForExistence(timeout: 0.25)
         }
         return false
     }

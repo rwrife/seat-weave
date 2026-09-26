@@ -38,6 +38,17 @@ verified by the CI script) is the merge gate for the App-target SwiftUI
 code and the simulator journey; Linux cannot build iOS, so nothing here
 claims otherwise. Simulator evidence is not physical-device evidence.
 
+## CI repairs
+
+- Run 36031804625 failed at the duplicate-add warning assertion. The
+  uploaded xcresult accessibility hierarchy proved
+  `add-guest-duplicate-warning` was present as a `StaticText`, with the
+  expected warning label and the add field value `aster`. The failure was
+  a test-helper false negative: existence-only checks still fetched and
+  compared the label in a tight loop. The waiter now treats an empty
+  expected substring as an identity/existence assertion and uses bounded
+  `waitForExistence` polling. Product behavior was already correct.
+
 ## Explicit limits
 
 - VoiceOver audio-order at accessibility sizes for the new filter/search
