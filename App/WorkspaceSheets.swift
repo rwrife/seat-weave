@@ -6,27 +6,120 @@ struct AddGuestRow: View {
     @Environment(AppModel.self) private var model
     @FocusState private var nameFocused: Bool
     @State private var name = ""
+    /// Folded display names that already occur more than once or would
+    /// be duplicated by this add (issue #17): the row warns while typing
+    /// but never blocks — intentional duplicates stay legal.
+    var duplicateNames: Set<String> = []
+
+    private var foldedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .widthInsensitive, .diacriticInsensitive],
+                     locale: Locale(identifier: "und"))
+    }
 
     var body: some View {
-        HStack {
-            TextField("Add guest (alias ok)", text: $name)
-                .focused($nameFocused)
-                .onSubmit { nameFocused = false }
-                .accessibilityIdentifier("add-guest-field")
-            Button("Add") {
-                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { return }
-                model.perform { controller in
-                    try controller.perform { commands in
-                        _ = try commands.addGuest(displayName: trimmed)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                TextField("Add guest (alias ok)", text: $name)
+                    .focused($nameFocused)
+                    .onSubmit { nameFocused = false }
+                    .accessibilityIdentifier("add-guest-field")
+                Button("Add") {
+                    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    model.perform { controller in
+                        try controller.perform { commands in
+                            _ = try commands.addGuest(displayName: trimmed)
+                        }
                     }
+                    if model.alertMessage == nil { name = "" }
                 }
-                if model.alertMessage == nil { name = "" }
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("add-guest-button")
             }
-            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityIdentifier("add-guest-button")
+            if !foldedName.isEmpty && duplicateNames.contains(foldedName) {
+                Text("This matches another guest's name. They stay separate people; tap Add to keep the duplicate intentionally.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("add-guest-duplicate-warning")
+            }
         }
         .modifier(FailureAlertModifier())
+    }
+}
+
+/// Sheet-host box for rename presentation: `UUID` is not
+/// `Identifiable`, so the sheet(item:) call sites carry this one-field
+/// wrapper (same pattern as `ResizeBox`).
+struct RenameGuestBox: Identifiable {
+    let id: UUID
+}
+
+/// Renames one guest (issue #17). Only the display name changes: the
+/// guest UUID keeps every assignment in every variant and every pair
+/// preference attached. Warns when the new name matches another guest —
+/// duplicates stay legal and intentional; the roster disambiguates by
+/// seat label and per-person identifiers.
+struct RenameGuestSheet: View {
+    @Environment(AppModel.self) private var model
+    @FocusState private var nameFocused: Bool
+    let guestID: UUID
+    let onDone: () -> Void
+    @State private var name = ""
+
+    private var event: SeatingEvent? { model.event }
+
+    private var foldedName: String {
+        GuestRosterQuery.foldedDisplayName(name)
+    }
+
+    /// Folded names of OTHER guests, so the new name never warns about
+    /// matching itself by accident (the old name is gone once renamed).
+    private var otherNames: Set<String> {
+        guard let event else { return [] }
+        return Set(event.guests
+            .filter { $0.id != guestID }
+            .map { GuestRosterQuery.foldedDisplayName($0.displayName) })
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Rename guest")
+                .font(.headline)
+            Text("Current name: \(event?.guest(guestID)?.displayName ?? "?")")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("rename-current-name")
+            TextField("New name or alias", text: $name)
+                .focused($nameFocused)
+                .onSubmit { nameFocused = false }
+                .accessibilityIdentifier("rename-guest-field")
+            if !foldedName.isEmpty && otherNames.contains(foldedName) {
+                Text("Another guest already uses this name. They stay separate people; tap Rename to keep the duplicate intentionally.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("rename-duplicate-warning")
+            }
+            HStack(spacing: 12) {
+                Button("Keep current name", role: .cancel) { onDone() }
+                    .accessibilityIdentifier("rename-cancel-button")
+                Button("Rename") { confirm() }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("confirm-rename-button")
+            }
+        }
+        .padding(24)
+        .presentationDetents([.medium])
+        .modifier(FailureAlertModifier())
+    }
+
+    private func confirm() {
+        model.perform { controller in
+            try controller.perform { commands in
+                try commands.renameGuest(id: guestID, newName: name)
+            }
+        }
+        if model.alertMessage == nil { onDone() }
     }
 }
 

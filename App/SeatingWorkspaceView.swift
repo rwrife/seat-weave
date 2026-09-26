@@ -89,16 +89,20 @@ struct SessionControlBar: View {
 struct GuestsTab: View {
     @Environment(AppModel.self) private var model
     @State private var deletionTarget: SeatingWorkspaceView.DeletionTarget?
+    @State private var renameTarget: RenameGuestBox?
 
     var body: some View {
         List {
-            GuestsSectionContent(deletionTarget: $deletionTarget)
+            GuestsSectionContent(deletionTarget: $deletionTarget, renameTarget: $renameTarget)
         }
         .sheet(item: $deletionTarget) { target in
             DeleteGuestSheet(target: target) {
                 if model.selectedGuestID == target.id { model.selectedGuestID = nil }
                 deletionTarget = nil
             }
+        }
+        .sheet(item: $renameTarget) { box in
+            RenameGuestSheet(guestID: box.id) { renameTarget = nil }
         }
         .modifier(FailureAlertModifier())
     }
@@ -110,15 +114,36 @@ struct GuestsTab: View {
 struct GuestsSectionContent: View {
     @Environment(AppModel.self) private var model
     @Binding var deletionTarget: SeatingWorkspaceView.DeletionTarget?
+    @Binding var renameTarget: RenameGuestBox?
 
     var body: some View {
-        if let event = model.event {
+        if let event = model.event, let variant = model.selectedVariant {
+            let visible = GuestRosterQuery.visibleGuests(
+                in: event, variant: variant,
+                search: model.rosterSearch, filter: model.rosterFilter)
+            let duplicates = GuestRosterQuery.duplicateDisplayNameIDs(in: event)
             Section("Selected guest") {
                 if let guestID = model.selectedGuestID, let guest = event.guest(guestID) {
                     Text("\(guest.displayName) — \(model.seatLabel(for: guestID))")
                         .accessibilityIdentifier("selection.current")
+                    // Explain (issue #17) when the current filter or
+                    // search hides the selected guest from the roster.
+                    if !GuestRosterQuery.passes(guest, filter: model.rosterFilter, in: variant)
+                        || !GuestRosterQuery.name(guest, matchesSearch: model.rosterSearch) {
+                        Text("Selected guest is hidden by the current filter or search.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("selection.hidden-by-filter")
+                        Button("Show selected guest") {
+                            model.rosterSearch = ""
+                            model.rosterFilter = .all
+                        }
+                        .accessibilityIdentifier("reveal-selected-button")
+                    }
                     Button("Unseat") { unseat(guestID: guestID) }
                         .accessibilityIdentifier("unseat-button")
+                    Button("Rename guest") { renameTarget = RenameGuestBox(id: guestID) }
+                        .accessibilityIdentifier("rename-guest-button")
                     Button("Delete guest") { showDeletionSheet(guestID: guestID) }
                         .accessibilityIdentifier("delete-guest-button")
                     Button("Clear selection") { model.selectedGuestID = nil }
@@ -128,21 +153,86 @@ struct GuestsSectionContent: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Section("Guests") {
-                ForEach(event.guests, id: \.self) { guest in
-                    rosterRow(guest: guest)
-                }
-                if event.guests.isEmpty {
-                    Text("No guests yet. Add the first one below.")
+            if !duplicates.isEmpty {
+                Section {
+                    Text("Some guests share a display name. They stay separate people; seats and preferences follow each person, never the name.")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("duplicate-names-banner")
                 }
-                AddGuestRow()
+            }
+            Section("Guests (\(visible.count) of \(event.guests.count))") {
+                ForEach(visible, id: \.self) { guest in
+                    rosterRow(guest: guest, isDuplicate: duplicates.values.contains { $0.contains(guest.id) })
+                }
+                if visible.isEmpty {
+                    Text(event.guests.isEmpty
+                         ? "No guests yet. Add the first one below."
+                         : "No guests match the current search and filter.")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("roster-empty")
+                }
+                AddGuestRow(duplicateNames: GuestRosterQuery.foldedNameSet(in: event))
+            }
+            // Search and filter sit BELOW the roster so the first roster
+            // rows keep the exact viewport position the established
+            // journeys tap without scrolling (CI run 36027041095:
+            // sections inserted above pushed row 1 under the tab bar and
+            // its tap synthesized off-screen). They remain one scroll
+            // away for larger rosters, where they matter most.
+            Section {
+                HStack(spacing: 8) {
+                    ForEach(GuestRosterQuery.Filter.allCases, id: \.self) { filter in
+                        Button {
+                            model.rosterFilter = filter
+                        } label: {
+                            // Plain button + checkmark: the repo's
+                            // established selection idiom (roster/seat
+                            // rows); a ternary of two different
+                            // ButtonStyle types does not typecheck.
+                            HStack(spacing: 4) {
+                                Text(filter.label)
+                                if filter == model.rosterFilter {
+                                    Image(systemName: "checkmark.circle.fill")
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("filter-\(filter.rawValue)")
+                        .accessibilityLabel("\(filter.label) filter\(filter == model.rosterFilter ? ", selected" : "")")
+                    }
+                }
+                .listRowSeparator(.hidden)
+            } header: {
+                Text("Filter")
+            }
+            // In-list search field, not `.searchable`: the repo's CI
+            // evidence shows plain in-list text fields bridge to the
+            // accessibility hierarchy reliably while toolbar-adjacent
+            // search chrome is flaky (issue #4 journey notes). Search
+            // state lives in AppModel so tab switches keep it.
+            Section {
+                HStack {
+                    TextField("Search by name", text: Binding(
+                        get: { model.rosterSearch },
+                        set: { model.rosterSearch = $0 }
+                    ))
+                    .accessibilityIdentifier("guest-search-field")
+                    if !model.rosterSearch.isEmpty {
+                        Button("Clear search") { model.rosterSearch = "" }
+                            .accessibilityIdentifier("clear-search-button")
+                    }
+                }
+            } header: {
+                Text("Search")
             }
         }
     }
 
     @ViewBuilder
-    private func rosterRow(guest: GuestIdentity) -> some View {
+    private func rosterRow(guest: GuestIdentity, isDuplicate: Bool) -> some View {
         let seatLabel = model.seatLabel(for: guest.id)
         Button {
             model.selectedGuestID = guest.id
@@ -153,6 +243,12 @@ struct GuestsSectionContent: View {
                     Text(seatLabel)
                         .font(.caption)
                         .foregroundStyle(seatLabel == "Unseated" ? .secondary : .primary)
+                    if isDuplicate {
+                        Text("shares this name")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("duplicate-mark-\(guest.id.uuidString)")
+                    }
                 }
                 Spacer()
                 if model.selectedGuestID == guest.id {
@@ -162,10 +258,15 @@ struct GuestsSectionContent: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("roster-\(guest.displayName)")
-        // One element, one clear phrase: name first, then current seat.
-        // VoiceOver reads this row as a single item in roster order.
-        .accessibilityLabel("\(guest.displayName), \(seatLabel)")
+        // Identity is the UUID, not the name (issue #17): two guests may
+        // share a display name and must never share a control identifier.
+        .accessibilityIdentifier("roster-\(guest.id.uuidString)")
+        // One element, one clear phrase: name first, then current seat,
+        // then the duplicate-name warning. VoiceOver reads this row as a
+        // single item in roster order.
+        .accessibilityLabel(isDuplicate
+                            ? "\(guest.displayName), \(seatLabel), shares this name with another guest"
+                            : "\(guest.displayName), \(seatLabel)")
     }
 
     private func unseat(guestID: UUID) {

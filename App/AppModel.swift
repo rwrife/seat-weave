@@ -40,6 +40,11 @@ final class AppModel {
     /// Selected guest lives in app state (not view state) so switching
     /// between the compact Guests/Tables tabs cannot lose the selection.
     var selectedGuestID: UUID?
+    /// Roster search text and seating filter (issue #17) also live in app
+    /// state: moving between Guests and Tables — or across width changes —
+    /// must not silently reset what the host is looking for.
+    var rosterSearch: String = ""
+    var rosterFilter: GuestRosterQuery.Filter = .all
     /// Focused table belongs to app state too (PLAN.md): width or
     /// orientation changes and region switches must not reset it, and
     /// resizing never mutates assignments or focus.

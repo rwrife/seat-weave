@@ -79,7 +79,7 @@ final class SeatWeaveWorkspaceTransitionTests: XCTestCase {
         field.tap()
         field.typeText("\(name)\n")
         app.buttons["add-guest-button"].tap()
-        XCTAssertTrue(app.buttons["roster-\(name)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(rosterButton(app, name).waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -109,7 +109,7 @@ final class SeatWeaveWorkspaceTransitionTests: XCTestCase {
 
         // Start an ACTIVE assignment in compact: select Aster, do not seat yet.
         selectTab(app, "Guests")
-        app.buttons["roster-Aster"].tap()
+        rosterButton(app, "Aster").tap()
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "selection.current", containing: "Aster"))
 
         // Rotate mid-assignment: selection belongs to app state, not view
@@ -152,4 +152,15 @@ final class SeatWeaveWorkspaceTransitionTests: XCTestCase {
 
         app.terminate()
     }
+
+    /// Issue #17: roster row identifiers are per-guest UUIDs now, so
+    /// journeys locate rows by the leading name in the row's combined
+    /// accessibility label ("<name>, <seat>"). Names in these journeys
+    /// are unique; the new duplicate-name coverage queries per-person
+    /// labels directly in SeatWeaveGuestEditingJourneyTests.
+    private func rosterButton(_ app: XCUIApplication, _ name: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "\(name), "))
+            .firstMatch
+    }
+
 }
