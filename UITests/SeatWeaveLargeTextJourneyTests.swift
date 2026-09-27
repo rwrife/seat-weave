@@ -72,11 +72,21 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     /// lists are never scrolled under a sheet), then the app's table /
     /// scroll view. If neither exists (iOS 26 SwiftUI lists have been
     /// observed surfacing as neither kind to XCUITest), a coordinate
-    /// drag stays in the CENTRAL content band. CI run 36337108077 showed
-    /// the old y=0.75 start landed in the AX5XL tab-bar region on every
-    /// attempt, so the List never moved and seat 2 was never realized.
-    /// The central band remains within the List even when the navigation
-    /// and tab bars grow for accessibility text.
+    /// drag spans the full content band between the navigation bar and
+    /// the tab bar. CI runs 36337108077/36338870932 showed a small
+    /// 20%-of-screen drag (y=0.60->0.40) was too short to move a single
+    /// AX5XL-sized row out of view — the row can occupy most of the
+    /// screen at that text size, so a short drag looks like a no-op.
+    /// Spanning the full safe content band moves at least one full row.
+    private func contentBand(_ app: XCUIApplication) -> (top: CGFloat, bottom: CGFloat) {
+        let appFrame = app.frame
+        let tabBar = app.tabBars.firstMatch
+        let bottom = tabBar.exists ? tabBar.frame.minY - 4 : appFrame.maxY - 80
+        let navigationBar = app.navigationBars.firstMatch
+        let top = navigationBar.exists ? navigationBar.frame.maxY + 4 : appFrame.minY + 80
+        return (top, bottom)
+    }
+
     private func scrollDownOnce(_ app: XCUIApplication) {
         let sheet = app.sheets.firstMatch
         if sheet.exists {
@@ -90,8 +100,12 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         if table.exists { table.swipeUp(); return }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists { scroll.swipeUp(); return }
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
+        let (top, bottom) = contentBand(app)
+        let appFrame = app.frame
+        let startNorm = (bottom - appFrame.minY) / appFrame.height
+        let endNorm = (top - appFrame.minY) / appFrame.height
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startNorm))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endNorm))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
@@ -101,8 +115,12 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         if table.exists { table.swipeDown(); return }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists { scroll.swipeDown(); return }
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60))
+        let (top, bottom) = contentBand(app)
+        let appFrame = app.frame
+        let startNorm = (top - appFrame.minY) / appFrame.height
+        let endNorm = (bottom - appFrame.minY) / appFrame.height
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startNorm))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endNorm))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
