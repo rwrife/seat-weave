@@ -141,23 +141,60 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         return field
     }
 
+    /// Move an already-realized row by a small amount toward the usable
+    /// viewport. A full swipe is too coarse at AX5XL: CI runs 36019523093
+    /// and 36027341633 showed seat 2 beginning just under the enlarged tab
+    /// bar, then jumping above the viewport and being lazily unloaded.
+    private func nudgeTowardViewport(_ app: XCUIApplication, element: XCUIElement) {
+        let appFrame = app.frame
+        let tabBar = app.tabBars.firstMatch
+        let bottom = tabBar.exists ? tabBar.frame.minY : appFrame.maxY - 80
+        let navigationBar = app.navigationBars.firstMatch
+        let top = navigationBar.exists ? navigationBar.frame.maxY : appFrame.minY + 80
+
+        let startY: CGFloat
+        let endY: CGFloat
+        if element.frame.midY >= bottom {
+            // Finger up moves the row up, clear of the tab bar. Keep the
+            // movement smaller than one accessibility-sized row.
+            startY = 0.68
+            endY = 0.58
+        } else if element.frame.midY <= top {
+            // Finger down returns a row that was nudged above the header.
+            startY = 0.32
+            endY = 0.42
+        } else {
+            // The hierarchy can lag one frame behind hittability. Apply a
+            // minimal upward nudge rather than a destructive full swipe.
+            startY = 0.62
+            endY = 0.57
+        }
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+        start.press(forDuration: 0.05, thenDragTo: end)
+    }
+
     private func tap(_ app: XCUIApplication, identifier: String, scroll: Bool = true) {
         let deadline = Date().addingTimeInterval(25)
         var attempts = 0
         while Date() < deadline {
-            for element in candidates(app, identifier) where element.exists && element.isHittable {
-                element.tap()
+            let resolved = candidates(app, identifier).first { $0.exists }
+            if let resolved, resolved.isHittable {
+                resolved.tap()
                 return
             }
             if scroll {
                 attempts += 1
-                // Evidence run 36019523093: an element that exists but is
-                // momentarily unhittable gets lazily UNLOADED when the
-                // search keeps scrolling down — rows above the viewport
-                // vanish from the hierarchy. Every fourth attempt scrolls
-                // back up so the hunt is direction-robust (same guard
-                // waitAny already used).
-                if attempts % 4 == 0 { scrollUpOnce(app) } else { scrollDownOnce(app) }
+                if let resolved {
+                    nudgeTowardViewport(app, element: resolved)
+                } else if attempts % 2 == 0 {
+                    // Missing means lazy loading removed the row. Alternate
+                    // coarse directions until it is realized, then switch
+                    // immediately to the target-aware small nudge above.
+                    scrollUpOnce(app)
+                } else {
+                    scrollDownOnce(app)
+                }
             }
         }
         // One last pass without the hittable requirement to produce a
