@@ -72,12 +72,11 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     /// lists are never scrolled under a sheet), then the app's table /
     /// scroll view. If neither exists (iOS 26 SwiftUI lists have been
     /// observed surfacing as neither kind to XCUITest), a coordinate
-    /// drag starts NEAR THE BOTTOM of the content band — the only
-    /// region guaranteed to be inside the list viewport once any row is
-    /// visible and clear of the enlarged tab bar — because at
-    /// accessibility sizes the session banner occupies most of the
-    /// upper screen and a center-start drag lands on static text
-    /// instead of the list (CI run 35837348124).
+    /// drag stays in the CENTRAL content band. CI run 36337108077 showed
+    /// the old y=0.75 start landed in the AX5XL tab-bar region on every
+    /// attempt, so the List never moved and seat 2 was never realized.
+    /// The central band remains within the List even when the navigation
+    /// and tab bars grow for accessibility text.
     private func scrollDownOnce(_ app: XCUIApplication) {
         let sheet = app.sheets.firstMatch
         if sheet.exists {
@@ -91,8 +90,8 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         if table.exists { table.swipeUp(); return }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists { scroll.swipeUp(); return }
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
@@ -102,8 +101,8 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         if table.exists { table.swipeDown(); return }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists { scroll.swipeDown(); return }
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
@@ -187,10 +186,10 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
                 attempts += 1
                 if let resolved {
                     nudgeTowardViewport(app, element: resolved)
-                } else if attempts % 2 == 0 {
-                    // Missing means lazy loading removed the row. Alternate
-                    // coarse directions until it is realized, then switch
-                    // immediately to the target-aware small nudge above.
+                } else if attempts % 4 == 0 {
+                    // Missing means lazy loading removed the row. Keep the
+                    // proven 3-down / 1-up cadence from waitAny so the hunt
+                    // progresses downward but still recovers from overscroll.
                     scrollUpOnce(app)
                 } else {
                     scrollDownOnce(app)
