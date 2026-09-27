@@ -57,16 +57,27 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         return false
     }
 
-    /// CI evidence run 36027041095: List rows realized BELOW the
-    /// viewport pass `waitForExistence` but a coordinate tap on their
-    /// center lands on the tab bar (or the home-indicator strip) — no
-    /// error, the app action just never fires. Every interactive tap in
-    /// this journey therefore scrolls the frontmost list until the
-    /// element's center is actually hittable.
+    /// CI evidence runs 36027041095 + 36336704688: List rows realized
+    /// BELOW the viewport pass `waitForExistence` but are not hittable,
+    /// and a window-level `app.swipeUp()` does not reliably scroll the
+    /// roster List (it can land on keyboard chrome or a sibling scroll
+    /// view, so the field never moves into the viewport at all). Scroll
+    /// the List element itself — the repo's sheet-list idiom proved
+    /// element-scoped swipes target the right scroll view — and stop the
+    /// moment the element becomes hittable so lazy loading cannot unload
+    /// it by over-scrolling.
+    private func scrollContainer(_ app: XCUIApplication) -> XCUIElement {
+        let list = app.tables.firstMatch
+        if list.exists { return list }
+        let scroll = app.scrollViews.firstMatch
+        if scroll.exists { return scroll }
+        return app
+    }
+
     private func scrollUntilHittable(_ app: XCUIApplication, _ element: XCUIElement, maxSwipes: Int = 5) -> Bool {
         for _ in 0...maxSwipes {
             if element.exists, element.isHittable { return true }
-            app.swipeUp()
+            scrollContainer(app).swipeUp()
         }
         return element.exists && element.isHittable
     }
