@@ -164,20 +164,19 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         // helper must scroll first and require the field to be hittable.
         let searchField = app.textFields["guest-search-field"]
         tapWhenHittable(app, searchField, "guest-search-field", maxSwipes: 8)
-        searchField.typeText("ASTER")
-        // Both folded matches stay in the filtered roster (existence —
-        // the keyboard covers part of the list; taps come later).
+        searchField.typeText("ASTER\n") // Submit to dismiss keyboard so roster rows materialize
+        _ = waitGone(app.otherElements["keyplane"].firstMatch, timeout: 3)
+        // Both folded matches stay in the filtered roster
         XCTAssertTrue(rosterButton(app, "Aster").waitForExistence(timeout: 5))
         XCTAssertTrue(rosterButton(app, "aster").waitForExistence(timeout: 5))
         tapWhenHittable(app, searchField, "guest-search-field (second term)")
-        searchField.typeText("zzz")
+        searchField.typeText("zzz\n")
+        _ = waitGone(app.otherElements["keyplane"].firstMatch, timeout: 3)
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "roster-empty", containing: ""),
                       "no empty-state when search matches nobody")
         tapWhenHittable(app, app.buttons["clear-search-button"], "clear-search-button")
         XCTAssertTrue(rosterButton(app, "Aster").waitForExistence(timeout: 5),
                       "clearing search did not restore the roster")
-        // Dismiss any keyboard before list taps.
-        app.swipeDown()
 
         // --- Rename with identity preserved (acceptance rows 1 and 6). ---
         // The rename sheet shows the current name and takes the NEW name
