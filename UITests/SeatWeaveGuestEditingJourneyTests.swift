@@ -67,6 +67,18 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
     /// moment the element becomes hittable so lazy loading cannot unload
     /// it by over-scrolling.
     private func scrollContainer(_ app: XCUIApplication) -> XCUIElement {
+        // Prefer the frontmost sheet's scroll surface. App-level queries
+        // can return the background roster while a guest-detail sheet is
+        // covering it (run 36341196862), so swiping the first app scroll
+        // view never brings the sheet's rename action into view.
+        let sheet = app.sheets.firstMatch
+        if sheet.exists {
+            let sheetList = sheet.tables.firstMatch
+            if sheetList.exists { return sheetList }
+            let sheetScroll = sheet.scrollViews.firstMatch
+            if sheetScroll.exists { return sheetScroll }
+            return sheet
+        }
         let list = app.tables.firstMatch
         if list.exists { return list }
         let scroll = app.scrollViews.firstMatch
