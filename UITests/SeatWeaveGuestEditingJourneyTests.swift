@@ -87,9 +87,21 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
     }
 
     private func scrollUntilHittable(_ app: XCUIApplication, _ element: XCUIElement, maxSwipes: Int = 5) -> Bool {
-        for _ in 0...maxSwipes {
+        if element.exists, element.isHittable { return true }
+        let container = scrollContainer(app)
+        // "Selected guest" controls (rename/unseat/delete) are a
+        // top-anchored List section, ABOVE the roster rows a prior step
+        // may have scrolled past. CI run 36342484572 showed
+        // rename-guest-button unreachable because the helper only ever
+        // scrolled further down (swipeUp); try toward the top first,
+        // then fall back to scrolling down for lower content.
+        for _ in 0..<maxSwipes {
             if element.exists, element.isHittable { return true }
-            scrollContainer(app).swipeUp()
+            container.swipeDown()
+        }
+        for _ in 0..<maxSwipes {
+            if element.exists, element.isHittable { return true }
+            container.swipeUp()
         }
         return element.exists && element.isHittable
     }
