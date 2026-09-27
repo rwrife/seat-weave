@@ -71,8 +71,10 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         return element.exists && element.isHittable
     }
 
-    private func tapWhenHittable(_ app: XCUIApplication, _ element: XCUIElement, _ what: String) {
-        XCTAssertTrue(scrollUntilHittable(app, element), "\(what) never became hittable after scrolling")
+    private func tapWhenHittable(_ app: XCUIApplication, _ element: XCUIElement, _ what: String,
+                                  maxSwipes: Int = 5) {
+        XCTAssertTrue(scrollUntilHittable(app, element, maxSwipes: maxSwipes),
+                      "\(what) never became hittable after scrolling")
         element.tap()
         // Keyboard dismissal animation leaves stale hit targets briefly.
         _ = waitGone(app.otherElements["keyplane"].firstMatch, timeout: 3)
@@ -135,9 +137,13 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
                       "roster duplicate banner missing")
 
         // --- Search folds case (acceptance row 3). ---
+        // Search intentionally sits below the lazy roster so existing
+        // first-row interactions retain their proven viewport position.
+        // CI run 36263319782 showed that waiting for existence before
+        // scrolling can never realize this List row. The interaction
+        // helper must scroll first and require the field to be hittable.
         let searchField = app.textFields["guest-search-field"]
-        XCTAssertTrue(searchField.waitForExistence(timeout: 10))
-        tapWhenHittable(app, searchField, "guest-search-field")
+        tapWhenHittable(app, searchField, "guest-search-field", maxSwipes: 8)
         searchField.typeText("ASTER")
         // Both folded matches stay in the filtered roster (existence —
         // the keyboard covers part of the list; taps come later).
