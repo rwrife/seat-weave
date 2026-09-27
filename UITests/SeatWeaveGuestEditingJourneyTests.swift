@@ -139,7 +139,16 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         addField.typeText("aster") // folded duplicate of Aster
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "add-guest-duplicate-warning", containing: ""),
                       "duplicate-name warning missing while adding a matching name")
+        // Submit first so AddGuestRow's existing onSubmit clears focus.
+        // CI runs 36336704688 and 36338276427 showed keyplane remained
+        // open after tapping Add and consumed every subsequent roster
+        // swipe, leaving the below-roster search row unrealized.
+        addField.typeText("\n")
+        XCTAssertTrue(waitGone(app.otherElements["keyplane"].firstMatch, timeout: 3),
+                      "keyboard stayed open after submitting duplicate name")
         tapWhenHittable(app, app.buttons["add-guest-button"], "add-guest-button (intentional duplicate)")
+        XCTAssertFalse(app.otherElements["keyplane"].firstMatch.exists,
+                       "keyboard reopened before the search-row scroll")
         XCTAssertTrue(rosterButton(app, "aster", duplicate: true).waitForExistence(timeout: 5),
                       "duplicate copy missing or unmarked after intentional add")
         // Banner is a List-row Text: XCUITest surfaces it as a
