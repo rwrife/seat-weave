@@ -73,12 +73,16 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         // view never brings the sheet's rename action into view.
         let sheet = app.sheets.firstMatch
         if sheet.exists {
+            let sheetCollection = sheet.collectionViews.firstMatch
+            if sheetCollection.exists { return sheetCollection }
             let sheetList = sheet.tables.firstMatch
             if sheetList.exists { return sheetList }
             let sheetScroll = sheet.scrollViews.firstMatch
             if sheetScroll.exists { return sheetScroll }
             return sheet
         }
+        let collection = app.collectionViews.firstMatch
+        if collection.exists { return collection }
         let list = app.tables.firstMatch
         if list.exists { return list }
         let scroll = app.scrollViews.firstMatch
@@ -113,6 +117,20 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         element.tap()
         // Keyboard dismissal animation leaves stale hit targets briefly.
         _ = waitGone(app.otherElements["keyplane"].firstMatch, timeout: 3)
+    }
+
+    /// Return the roster to its first section. Search and filter controls
+    /// intentionally live below the lazy roster, so after using a filter the
+    /// selected-guest explanation is above the rendered window. iOS 26
+    /// exposes this SwiftUI List as a collection view; target it directly
+    /// instead of swiping the app window.
+    private func rewindRosterToTop(_ app: XCUIApplication, maxSwipes: Int = 8) {
+        let selection = app.staticTexts["selection.current"]
+        let container = scrollContainer(app)
+        for _ in 0..<maxSwipes {
+            if selection.exists { return }
+            container.swipeDown()
+        }
     }
 
     /// Roster rows carry per-guest UUID identifiers (issue #17), so
@@ -249,6 +267,7 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
                       "unseated guest missing under Unseated filter")
         // The selected (seated) asterid is hidden by the filter — the
         // selection must be preserved AND explained, not dropped.
+        rewindRosterToTop(app)
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "selection.current", containing: "asterid"),
                       "selection lost when the filter hid the guest")
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "selection.hidden-by-filter",
