@@ -90,12 +90,16 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     private func scrollDownOnce(_ app: XCUIApplication) {
         let sheet = app.sheets.firstMatch
         if sheet.exists {
+            let sheetCollection = sheet.collectionViews.firstMatch
+            if sheetCollection.exists { sheetCollection.swipeUp(); return }
             let sheetTable = sheet.tables.firstMatch
             if sheetTable.exists { sheetTable.swipeUp(); return }
             let sheetScroll = sheet.scrollViews.firstMatch
             if sheetScroll.exists { sheetScroll.swipeUp(); return }
             return // Sheet without a scrollable surface: scrolling cannot help.
         }
+        let collection = app.collectionViews.firstMatch
+        if collection.exists { collection.swipeUp(); return }
         let table = app.tables.firstMatch
         if table.exists { table.swipeUp(); return }
         let scroll = app.scrollViews.firstMatch
@@ -111,6 +115,8 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
 
     private func scrollUpOnce(_ app: XCUIApplication) {
         if app.sheets.firstMatch.exists { return }
+        let collection = app.collectionViews.firstMatch
+        if collection.exists { collection.swipeDown(); return }
         let table = app.tables.firstMatch
         if table.exists { table.swipeDown(); return }
         let scroll = app.scrollViews.firstMatch
@@ -186,8 +192,15 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
             startY = 0.62
             endY = 0.57
         }
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+        // iOS 26 exposes SwiftUI List as a collection view in this lane.
+        // Gesture on that surface rather than the application window: a
+        // window drag can be claimed by the enlarged tab bar and leave the
+        // row fixed below it (run 36341598037).
+        let surface = app.collectionViews.firstMatch.exists
+            ? app.collectionViews.firstMatch
+            : app
+        let start = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
+        let end = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
