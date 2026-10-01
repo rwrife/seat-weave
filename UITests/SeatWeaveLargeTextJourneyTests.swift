@@ -87,6 +87,43 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         return (top, bottom)
     }
 
+    // Run 36465561808 root cause (from the failing run's xcresult
+    // hierarchy dumps): after the event-creation push, the NavigationStack
+    // keeps the event-list screen's CollectionView MOUNTED behind the
+    // pushed workspace (the failure snapshot still contained
+    // `event-title-field`/`create-event-button` next to the 3-page Guests
+    // list). `collectionViews.firstMatch` therefore swiped the
+    // background 1-page list — the Guests list's scroll bar reported
+    // `value: 0%` through every swipe — and `add-guest-field` never
+    // realized. The front-most mounted screen is the LAST mounted
+    // collection, so scroll against `lastMatch` (identical to firstMatch
+    // while only one surface is mounted, i.e. no regression elsewhere).
+    // The front-most mounted screen is the LAST mounted collection.
+    // (XCUIElementQuery has no `lastMatch` property — index via count.)
+    private func frontScrollSurface(_ app: XCUIApplication) -> XCUIElement {
+        let collections = app.collectionViews
+        if collections.count > 0 { return collections.element(boundBy: collections.count - 1) }
+        let tables = app.tables
+        if tables.count > 0 { return tables.element(boundBy: tables.count - 1) }
+        let scrolls = app.scrollViews
+        if scrolls.count > 0 { return scrolls.element(boundBy: scrolls.count - 1) }
+        return app
+    }
+
+    private func contentBandDrag(_ app: XCUIApplication, downward: Bool) {
+        let (top, bottom) = contentBand(app)
+        let appFrame = app.frame
+        let startNorm = downward
+            ? (bottom - appFrame.minY) / appFrame.height
+            : (top - appFrame.minY) / appFrame.height
+        let endNorm = downward
+            ? (top - appFrame.minY) / appFrame.height
+            : (bottom - appFrame.minY) / appFrame.height
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startNorm))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endNorm))
+        start.press(forDuration: 0.05, thenDragTo: end)
+    }
+
     private func scrollDownOnce(_ app: XCUIApplication) {
         let sheet = app.sheets.firstMatch
         if sheet.exists {
@@ -98,36 +135,16 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
             if sheetScroll.exists { sheetScroll.swipeUp(); return }
             return // Sheet without a scrollable surface: scrolling cannot help.
         }
-        let collection = app.collectionViews.firstMatch
-        if collection.exists { collection.swipeUp(); return }
-        let table = app.tables.firstMatch
-        if table.exists { table.swipeUp(); return }
-        let scroll = app.scrollViews.firstMatch
-        if scroll.exists { scroll.swipeUp(); return }
-        let (top, bottom) = contentBand(app)
-        let appFrame = app.frame
-        let startNorm = (bottom - appFrame.minY) / appFrame.height
-        let endNorm = (top - appFrame.minY) / appFrame.height
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startNorm))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endNorm))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        let surface = frontScrollSurface(app)
+        if surface != app { surface.swipeUp(); return }
+        contentBandDrag(app, downward: true)
     }
 
     private func scrollUpOnce(_ app: XCUIApplication) {
         if app.sheets.firstMatch.exists { return }
-        let collection = app.collectionViews.firstMatch
-        if collection.exists { collection.swipeDown(); return }
-        let table = app.tables.firstMatch
-        if table.exists { table.swipeDown(); return }
-        let scroll = app.scrollViews.firstMatch
-        if scroll.exists { scroll.swipeDown(); return }
-        let (top, bottom) = contentBand(app)
-        let appFrame = app.frame
-        let startNorm = (top - appFrame.minY) / appFrame.height
-        let endNorm = (bottom - appFrame.minY) / appFrame.height
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startNorm))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endNorm))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        let surface = frontScrollSurface(app)
+        if surface != app { surface.swipeDown(); return }
+        contentBandDrag(app, downward: false)
     }
 
     /// Polls for an identified element across element kinds, scrolling
@@ -153,12 +170,23 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     }
 
     private func waitField(_ app: XCUIApplication, identifier: String,
-                           timeout: TimeInterval = 25, scroll: Bool = true) -> XCUIElement {
+                           timeout: TimeInterval = 30, scroll: Bool = true) -> XCUIElement {
         let field = app.textFields[identifier]
         let deadline = Date().addingTimeInterval(timeout)
+        var attempts = 0
         while Date() < deadline {
             if field.exists, field.isHittable { return field }
-            if scroll { scrollDownOnce(app) }
+            if scroll {
+                attempts += 1
+                // Run 36465561808: element-targeted swipes can be claimed
+                // by a NavigationStack-mounted background list (the
+                // transition keeps BOTH screens' CollectionViews mounted
+                // — failure snapshots proved the Guests list stayed at
+                // scroll value 0% through 20 element swipes). A coordinate
+                // drag inside the content band always synthesizes against
+                // the frontmost window, so alternate the two strategies.
+                if attempts % 2 == 0 { scrollDownOnce(app) } else { contentBandDrag(app, downward: true) }
+            }
         }
         XCTAssertTrue(field.exists, "text field \(identifier) never found even after scrolling")
         return field
@@ -193,12 +221,11 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
             endY = 0.57
         }
         // iOS 26 exposes SwiftUI List as a collection view in this lane.
-        // Gesture on that surface rather than the application window: a
-        // window drag can be claimed by the enlarged tab bar and leave the
-        // row fixed below it (run 36341598037).
-        let surface = app.collectionViews.firstMatch.exists
-            ? app.collectionViews.firstMatch
-            : app
+        // Gesture on the FRONT-MOST mounted collection (see
+        // frontScrollSurface): a firstMatch drag can be claimed by the
+        // background event-list screen and leave the row fixed below the
+        // tab bar (runs 36341598037, 36465561808).
+        let surface = frontScrollSurface(app)
         let start = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
         let end = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
         start.press(forDuration: 0.05, thenDragTo: end)

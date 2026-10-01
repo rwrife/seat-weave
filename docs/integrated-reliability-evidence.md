@@ -105,6 +105,21 @@ suites including the full-journey store test, and executes
 alongside the pre-existing journeys. Run results are recorded in the PR
 conversation once the run completes; the merge only happens on green.
 
+## CI repairs
+
+- Run 36465561808 (head 875230d): `add-guest-field` never realized on
+  the Guests tab even after ~20 `Swipe up CollectionView (First Match)`
+  attempts. The failing run's xcresult hierarchy dumps proved the cause:
+  after the event-creation push the NavigationStack keeps the event-list
+  screen's CollectionView MOUNTED behind the workspace (its
+  `event-title-field`/`create-event-button` appear in the failure
+  snapshot), so `firstMatch` swiped the background 1-page list while the
+  front 3-page Guests list reported `Vertical scroll bar ... value: 0%`
+  unchanged. The scroll helpers (`scrollDownOnce`, `scrollUpOnce`,
+  `nudgeTowardViewport`) now target `lastMatch` — the front-most mounted
+  surface, identical to `firstMatch` whenever only one surface exists —
+  so the real list finally moves. Simulator evidence only.
+
 ## Evidence matrix (issue #6 deliverable)
 
 | Check | Method | Status | Where recorded |
