@@ -261,7 +261,17 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
                       "seat lost the renamed guest: \(app.buttons["seat-Round1-1"].label)")
 
         // --- Filters with selection continuity (acceptance rows 3-4). ---
+        // Run 36465568591 root cause: a SUCCESSFUL seat tap clears the
+        // selection by design (`seatTapped` releases the picked guest
+        // after the assignment persists), so the phase below was testing
+        // continuity of an already-empty selection and `selection.current`
+        // correctly showed the "Tap a guest to select" placeholder. The
+        // filter itself never dropped anything. Re-select first, then the
+        // Unseated filter genuinely hides the seated selection.
         selectTab(app, "Guests")
+        tapWhenHittable(app, rosterButton(app, "asterid"), "roster asterid (re-select after seating)")
+        XCTAssertTrue(waitIdentifiedLabel(app, identifier: "selection.current", containing: "asterid"),
+                      "re-selection after seating did not register")
         tapWhenHittable(app, app.buttons["filter-unseated"], "filter-unseated")
         XCTAssertTrue(rosterButton(app, "aster").waitForExistence(timeout: 5),
                       "unseated guest missing under Unseated filter")

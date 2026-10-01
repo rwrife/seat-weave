@@ -48,6 +48,15 @@ claims otherwise. Simulator evidence is not physical-device evidence.
   compared the label in a tight loop. The waiter now treats an empty
   expected substring as an identity/existence assertion and uses bounded
   `waitForExistence` polling. Product behavior was already correct.
+- Run 36465568591 (head 771f0a6) failed at "selection lost when the
+  filter hid the guest." The xcresult dump showed the app displaying the
+  "Tap a guest to select" placeholder — not a lost selection. A
+  SUCCESSFUL seat tap releases the picked guest by design (`seatTapped`
+  clears `selectedGuestID` once the assignment persists), so the
+  filter-continuity phase asserted continuity of an already-empty
+  selection. The journey now explicitly re-selects the seated guest
+  before applying the Unseated filter, which is the precondition the
+  acceptance row describes. Product behavior was already correct.
 
 ## Explicit limits
 
