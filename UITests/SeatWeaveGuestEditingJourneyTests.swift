@@ -294,6 +294,12 @@ final class SeatWeaveGuestEditingJourneyTests: XCTestCase {
         tapWhenHittable(app, app.buttons["filter-unseated"], "filter-unseated (again)")
         tapWhenHittable(app, rosterButton(app, "aster"), "roster aster")
         tapWhenHittable(app, app.buttons["filter-seated"], "filter-seated (hide selection)")
+        // Same realization lesson as the first hidden-by-filter check:
+        // the filter chips live BELOW the lazy roster, so after this tap
+        // the top-anchored explanation is scrolled out and unrendered.
+        // Rewind first (run 36810916816 proved the assertion itself is
+        // correct once the row is realized).
+        rewindRosterToTop(app)
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "selection.hidden-by-filter",
                                           containing: "hidden"),
                       "selection not explained when hidden by Seated filter")
