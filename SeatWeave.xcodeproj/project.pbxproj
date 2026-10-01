@@ -21,6 +21,7 @@
 		A1000000000000000000010C /* SeatingWorkspaceLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020C /* SeatingWorkspaceLayout.swift */; };
 		A1000000000000000000010D /* SeatWeaveWorkspaceTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */; };
 		A1000000000000000000010E /* SeatWeaveRegularWidthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */; };
+		A10000000000000000000110 /* SeatWeaveGuestEditingJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000211 /* SeatWeaveGuestEditingJourneyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +50,7 @@
 		A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveWorkspaceTransitionTests.swift; sourceTree = "<group>"; };
 		A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveRegularWidthTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000210 /* SeatWeaveSeatingJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveSeatingJourneyTests.swift; sourceTree = "<group>"; };
+		A10000000000000000000211 /* SeatWeaveGuestEditingJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatWeaveGuestEditingJourneyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +104,7 @@
 				A1000000000000000000020B /* SeatWeaveShareJourneyTests.swift */,
 				A1000000000000000000020D /* SeatWeaveWorkspaceTransitionTests.swift */,
 				A1000000000000000000020E /* SeatWeaveRegularWidthTests.swift */,
+				A10000000000000000000211 /* SeatWeaveGuestEditingJourneyTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -240,6 +243,7 @@
 				A1000000000000000000010B /* SeatWeaveShareJourneyTests.swift in Sources */,
 				A1000000000000000000010D /* SeatWeaveWorkspaceTransitionTests.swift in Sources */,
 				A1000000000000000000010E /* SeatWeaveRegularWidthTests.swift in Sources */,
+				A10000000000000000000110 /* SeatWeaveGuestEditingJourneyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

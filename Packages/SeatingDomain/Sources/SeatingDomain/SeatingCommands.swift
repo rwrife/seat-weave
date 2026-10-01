@@ -50,6 +50,26 @@ public struct SeatingCommands {
         return GuestIdentity(id: id, displayName: name)
     }
 
+    /// Renaming changes ONLY the display name. The guest UUID is the
+    /// identity, so assignments in every variant and every pair
+    /// preference survive untouched; duplicate display names remain
+    /// separate identities. Trims surrounding whitespace, rejects an
+    /// empty result and is undoable like every other command.
+    @discardableResult
+    public mutating func renameGuest(id guestID: UUID, newName: String) throws -> SeatingEvent {
+        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw CommandError("Guest name cannot be empty.") }
+        guard let index = event.guests.firstIndex(where: { $0.id == guestID }) else {
+            throw CommandError("Unknown guest.")
+        }
+        // A no-op rename must not pollute the undo stack.
+        guard event.guests[index].displayName != name else { return event }
+        commit { model in
+            model.guests[index].displayName = name
+        }
+        return event
+    }
+
     /// Preview of what removing a guest would change across all variants.
     public func guestDeletionPreview(guestID: UUID) throws -> GuestDeletionPreview {
         guard event.guest(guestID) != nil else { throw CommandError("Unknown guest.") }
