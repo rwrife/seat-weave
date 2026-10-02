@@ -107,6 +107,23 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 36810913152 (head 132612f): `seat-Round1-2` never became tappable.
+  The failing run's xcresult query dumps show the seat hunt DID move the
+  real front list (scroll-bar values walked 0% → 34% → 100% → 79%…) and
+  the button existed early at ~03:57:09, but the realized row sat outside
+  the small CollectionView viewport (chart list frame is only ~298pt tall
+  between the AX5XL-enlarged nav bar and tab bar) and the `tap()` hunt
+  ended in `nudgeTowardViewport` drags — which were still element-targeted
+  `CollectionView` drags. Element-targeted synthesized drags on this
+  iOS 26 list are unreliable (run 36465561808 proved the same for
+  `waitField`); the window-level content-band coordinate drag reaches the
+  real scroll view. `scrollDownOnce`/`scrollUpOnce` now alternate element
+  swipes with content-band drives (same proven cadence as `waitField`),
+  so nudges actually move the row into the hittable viewport. Simulator
+  evidence only; physical-device rows below stay blocked.
+  (Independent second failure in the same job —
+  `SeatWeaveRegularWidthTests` — is main-repo poison from the device-family
+  regression fixed in PR #24, not this branch.)
 - Run 36465561808 (head 875230d): `add-guest-field` never realized on
   the Guests tab even after ~20 `Swipe up CollectionView (First Match)`
   attempts. The failing run's xcresult hierarchy dumps proved the cause:

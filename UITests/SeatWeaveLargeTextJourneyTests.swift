@@ -124,6 +124,18 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    // Run 36810913152 root cause (from the failing run's xcresult
+    // query dumps): during the seat-Round1-2 hunt the mounted
+    // CollectionView's own element-targeted `swipeUp` left the list's
+    // `Vertical scroll bar, 4 pages' value pinned at 0% through ~20
+    // attempts — the synthesized swipe never reached the real scroll
+    // view (the row stayed unrealized). The window-level coordinate
+    // drag across the content band is the strategy already proven in
+    // `waitField` for exactly this stall (run 36465561808): it always
+    // synthesizes against the front-most window. Alternate the two so
+    // every second attempt is a band drag.
+    private var scrollCadence = 0
+
     private func scrollDownOnce(_ app: XCUIApplication) {
         let sheet = app.sheets.firstMatch
         if sheet.exists {
@@ -135,15 +147,31 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
             if sheetScroll.exists { sheetScroll.swipeUp(); return }
             return // Sheet without a scrollable surface: scrolling cannot help.
         }
+        scrollCadence += 1
         let surface = frontScrollSurface(app)
-        if surface != app { surface.swipeUp(); return }
+        if surface != app {
+            if scrollCadence % 2 == 0 {
+                surface.swipeUp()
+            } else {
+                contentBandDrag(app, downward: true)
+            }
+            return
+        }
         contentBandDrag(app, downward: true)
     }
 
     private func scrollUpOnce(_ app: XCUIApplication) {
         if app.sheets.firstMatch.exists { return }
+        scrollCadence += 1
         let surface = frontScrollSurface(app)
-        if surface != app { surface.swipeDown(); return }
+        if surface != app {
+            if scrollCadence % 2 == 0 {
+                surface.swipeDown()
+            } else {
+                contentBandDrag(app, downward: false)
+            }
+            return
+        }
         contentBandDrag(app, downward: false)
     }
 
