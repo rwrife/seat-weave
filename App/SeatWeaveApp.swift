@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct SeatWeaveApp: App {
@@ -42,5 +43,25 @@ struct RootView: View {
                 model.open(eventID: id)
             }
         }
+        // Test-only environment probe (launch flag -contentProbe YES):
+        // surfaces the ACTUAL Dynamic Type category the environment
+        // resolved so the issue #6 large-text journey can prove the
+        // simctl-set content size really took effect. Never rendered
+        // for user launches.
+        .overlay(alignment: .topLeading) {
+            if model.contentProbeEnabled {
+                ContentSizeProbeView()
+            }
+        }
+    }
+}
+
+/// Renders the environment content-size category for UI tests. Lives in
+/// a bare overlay so it never affects layout or VoiceOver ordering in
+/// user builds (flag-gated, and flag clears at AppModel init).
+struct ContentSizeProbeView: View {
+    var body: some View {
+        Text("content-size:\(UIApplication.shared.preferredContentSizeCategory.rawValue)")
+            .accessibilityIdentifier("content-size-probe")
     }
 }

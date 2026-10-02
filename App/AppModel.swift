@@ -32,6 +32,9 @@ final class AppModel {
     /// XCTest launch flag: `-layoutToggle` shows the workspace-region
     /// override switch. Normal launches never render it.
     static let layoutToggleKey = "layoutToggle"
+    /// XCTest launch flag: `-contentProbe` surfaces the environment
+    /// Dynamic Type category for the issue #6 large-text journey.
+    static let contentProbeKey = "contentProbe"
 
     private(set) var events: [SeatingEvent] = []
     private(set) var controller: PersistentSeatingController?
@@ -74,10 +77,14 @@ final class AppModel {
     /// Captured at init: whether THIS launch may show the workspace-region
     /// override switch (launch flag `-layoutToggle YES`).
     let layoutToggleEnabled: Bool
+    /// Captured at init: whether THIS launch may render the content-size
+    /// probe (launch flag `-contentProbe YES`, issue #6 large-text gate).
+    let contentProbeEnabled: Bool
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.layoutToggleEnabled = defaults.bool(forKey: AppModel.layoutToggleKey)
+        self.contentProbeEnabled = defaults.bool(forKey: AppModel.contentProbeKey)
         if AppModel.resetStoreRequested {
             AppModel.wipeStoreDirectory()
             defaults.removeObject(forKey: AppModel.lastEventKey)
@@ -91,6 +98,10 @@ final class AppModel {
         // leak into later launches (or user runs).
         if layoutToggleEnabled {
             defaults.removeObject(forKey: AppModel.layoutToggleKey)
+            defaults.synchronize()
+        }
+        if contentProbeEnabled {
+            defaults.removeObject(forKey: AppModel.contentProbeKey)
             defaults.synchronize()
         }
         self.store = AppModel.makeStore()
