@@ -65,18 +65,25 @@ struct SeatingWorkspaceLayout: View {
 /// Compact phone region: navigate between guests, seats, pairs, plans and
 /// share exactly like the README's compact-phone design.
 struct CompactWorkspaceTabs: View {
+    @Environment(AppModel.self) private var model
+
     var body: some View {
-        TabView {
+        TabView(selection: Binding(get: { model.compactTab }, set: { model.compactTab = $0 })) {
             GuestsTab()
                 .tabItem { Label("Guests", systemImage: "person.2") }
+                .tag(AppModel.WorkspaceTab.guests)
             TablesTab()
                 .tabItem { Label("Tables", systemImage: "circle.grid.circle") }
+                .tag(AppModel.WorkspaceTab.tables)
             PairsTab()
                 .tabItem { Label("Pairs", systemImage: "heart.text.square") }
+                .tag(AppModel.WorkspaceTab.pairs)
             PlansTab()
                 .tabItem { Label("Plans", systemImage: "square.on.square.dashed") }
+                .tag(AppModel.WorkspaceTab.plans)
             ShareTab()
                 .tabItem { Label("Share", systemImage: "square.and.arrow.up") }
+                .tag(AppModel.WorkspaceTab.share)
         }
     }
 }
@@ -113,14 +120,19 @@ struct RegularWorkspaceSidebar: View {
 /// Regular-width chart column: the selected table chart with plans and
 /// sharing reachable beside the persistent roster.
 struct RegularWorkspaceChart: View {
+    @Environment(AppModel.self) private var model
+
     var body: some View {
-        TabView {
+        TabView(selection: Binding(get: { model.regularTab }, set: { model.regularTab = $0 })) {
             TablesTab()
                 .tabItem { Label("Tables", systemImage: "circle.grid.circle") }
+                .tag(AppModel.WorkspaceTab.tables)
             PlansTab()
                 .tabItem { Label("Plans", systemImage: "square.on.square.dashed") }
+                .tag(AppModel.WorkspaceTab.plans)
             ShareTab()
                 .tabItem { Label("Share", systemImage: "square.and.arrow.up") }
+                .tag(AppModel.WorkspaceTab.share)
         }
     }
 }
