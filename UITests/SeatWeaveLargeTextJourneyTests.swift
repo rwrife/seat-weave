@@ -77,14 +77,24 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     /// 20%-of-screen drag (y=0.60->0.40) was too short to move a single
     /// AX5XL-sized row out of view — the row can occupy most of the
     /// screen at that text size, so a short drag looks like a no-op.
-    /// Spanning the full safe content band moves at least one full row.
+    /// The gesture must begin within the unobscured content band, not at
+    /// the enlarged tab bar's hit area (even when the List's reported
+    /// collection frame extends underneath that bar).
     private func contentBand(_ app: XCUIApplication) -> (top: CGFloat, bottom: CGFloat) {
         let appFrame = app.frame
+        let surface = frontScrollSurface(app)
         let tabBar = app.tabBars.firstMatch
-        let bottom = tabBar.exists ? tabBar.frame.minY - 4 : appFrame.maxY - 80
         let navigationBar = app.navigationBars.firstMatch
-        let top = navigationBar.exists ? navigationBar.frame.maxY + 4 : appFrame.minY + 80
-        return (top, bottom)
+        // Run 37302205727's failure hierarchy proved an app-level drag
+        // starting at y=580 (only 4pt above the tab bar) SWITCHED to Pairs
+        // while looking for seat 2. The collection itself is y=368..667;
+        // constrain the gesture to its unobscured interior and leave a
+        // generous 70pt gap above the enlarged tab controls/overlay.
+        let top = max(navigationBar.exists ? navigationBar.frame.maxY + 4 : appFrame.minY + 80,
+                      surface == app ? appFrame.minY + 80 : surface.frame.minY + 20)
+        let bottom = min(tabBar.exists ? tabBar.frame.minY - 70 : appFrame.maxY - 80,
+                         surface == app ? appFrame.maxY - 80 : surface.frame.maxY - 70)
+        return (top, max(top + 40, bottom))
     }
 
     // Run 36465561808 root cause (from the failing run's xcresult
@@ -225,37 +235,24 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     /// and 36027341633 showed seat 2 beginning just under the enlarged tab
     /// bar, then jumping above the viewport and being lazily unloaded.
     private func nudgeTowardViewport(_ app: XCUIApplication, element: XCUIElement) {
-        let appFrame = app.frame
-        let tabBar = app.tabBars.firstMatch
-        let bottom = tabBar.exists ? tabBar.frame.minY : appFrame.maxY - 80
-        let navigationBar = app.navigationBars.firstMatch
-        let top = navigationBar.exists ? navigationBar.frame.maxY : appFrame.minY + 80
-
+        let (top, bottom) = contentBand(app)
         let startY: CGFloat
         let endY: CGFloat
         if element.frame.midY >= bottom {
-            // Finger up moves the row up, clear of the tab bar. Keep the
-            // movement smaller than one accessibility-sized row.
-            startY = 0.68
-            endY = 0.58
+            startY = bottom - 5
+            endY = max(top + 5, startY - 35)
         } else if element.frame.midY <= top {
-            // Finger down returns a row that was nudged above the header.
-            startY = 0.32
-            endY = 0.42
+            startY = top + 5
+            endY = min(bottom - 5, startY + 35)
         } else {
-            // The hierarchy can lag one frame behind hittability. Apply a
-            // minimal upward nudge rather than a destructive full swipe.
-            startY = 0.62
-            endY = 0.57
+            startY = bottom - 10
+            endY = max(top + 5, startY - 20)
         }
-        // iOS 26 exposes SwiftUI List as a collection view in this lane.
-        // Gesture on the FRONT-MOST mounted collection (see
-        // frontScrollSurface): a firstMatch drag can be claimed by the
-        // background event-list screen and leave the row fixed below the
-        // tab bar (runs 36341598037, 36465561808).
-        let surface = frontScrollSurface(app)
-        let start = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
-        let end = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+        // Use screen coordinates on the app rather than percentages of
+        // the CollectionView: its frame extends UNDER the tab bar on AX5XL.
+        let origin = app.frame
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - origin.minY) / origin.height))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - origin.minY) / origin.height))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
@@ -282,21 +279,8 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
                 }
             }
         }
-        // Failure-path geometry is needed to distinguish an off-screen
-        // row from a gesture intercepted by another mounted scroll view.
-        // Synthetic fixtures only; never capture a real guest roster here.
         let element = candidates(app, identifier).first { $0.exists } ?? app.buttons[identifier]
-        if !element.isHittable {
-            let surface = frontScrollSurface(app)
-            let bars = app.descendants(matching: .any).matching(
-                NSPredicate(format: "label CONTAINS %@", "Vertical scroll bar")
-            ).allElementsBoundByIndex.map { "\($0.label): \(String(describing: $0.value))" }
-            XCTFail("\(identifier) never became tappable; attempts=\(attempts), "
-                    + "exists=\(element.exists), frame=\(element.exists ? String(describing: element.frame) : "missing"), "
-                    + "surface=\(surface.frame), contentBand=\(contentBand(app)), bars=\(bars); "
-                    + "hierarchy=\(app.debugDescription)")
-            return
-        }
+        XCTAssertTrue(element.isHittable, "\(identifier) never became tappable inside the active list's content band")
         element.tap()
     }
 

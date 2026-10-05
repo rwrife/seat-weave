@@ -107,6 +107,19 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 37302205727 (head 6cd7d3e): failure-path hierarchy proved the
+  `seat-Round1-2` hunt was actually on **Pairs**, not Tables: the gesture
+  began at y=580, only 4 points above the enlarged tab bar (which spans
+  y=584..667), and the front list showed the Pairs section with scroll
+  value 0%. This was an unintended tab switch, not a missing seat or a
+  domain failure. The repair clamps both content-band drags and small
+  nudges inside the active list's unobscured interior, 70 points above
+  the tab bar. Await a fresh exact-head simulator run before accepting.
+- Run 37044039730 (head ef8a6ba): four compact journeys passed, but the
+  AX5XL seat-2 hunt failed; the one-shot diagnostic run above resolves
+  its cause. The separate regular-width failure is main's phone-only
+  device-family regression, addressed independently by PR #24.
+
 - Run 36810913152 (head 132612f): `seat-Round1-2` never became tappable.
   The failing run's xcresult query dumps show the seat hunt DID move the
   real front list (scroll-bar values walked 0% → 34% → 100% → 79%…) and
@@ -133,9 +146,10 @@ conversation once the run completes; the merge only happens on green.
   snapshot), so `firstMatch` swiped the background 1-page list while the
   front 3-page Guests list reported `Vertical scroll bar ... value: 0%`
   unchanged. The scroll helpers (`scrollDownOnce`, `scrollUpOnce`,
-  `nudgeTowardViewport`) now target `lastMatch` — the front-most mounted
-  surface, identical to `firstMatch` whenever only one surface exists —
-  so the real list finally moves. Simulator evidence only.
+  `nudgeTowardViewport`) now target the front-most content band
+  rather than the background event list; their coordinates never begin
+  in the enlarged tab bar (see the 37302205727 repair above), so the
+  active list moves without switching tabs. Simulator evidence only.
 
 ## Evidence matrix (issue #6 deliverable)
 
