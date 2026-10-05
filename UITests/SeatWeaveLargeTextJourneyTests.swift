@@ -282,10 +282,21 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
                 }
             }
         }
-        // One last pass without the hittable requirement to produce a
-        // precise failure message.
+        // Failure-path geometry is needed to distinguish an off-screen
+        // row from a gesture intercepted by another mounted scroll view.
+        // Synthetic fixtures only; never capture a real guest roster here.
         let element = candidates(app, identifier).first { $0.exists } ?? app.buttons[identifier]
-        XCTAssertTrue(element.isHittable, "\(identifier) never became tappable even after scrolling")
+        if !element.isHittable {
+            let surface = frontScrollSurface(app)
+            let bars = app.descendants(matching: .any).matching(
+                NSPredicate(format: "label CONTAINS %@", "Vertical scroll bar")
+            ).allElementsBoundByIndex.map { "\($0.label): \(String(describing: $0.value))" }
+            XCTFail("\(identifier) never became tappable; attempts=\(attempts), "
+                    + "exists=\(element.exists), frame=\(element.exists ? String(describing: element.frame) : "missing"), "
+                    + "surface=\(surface.frame), contentBand=\(contentBand(app)), bars=\(bars); "
+                    + "hierarchy=\(app.debugDescription)")
+            return
+        }
         element.tap()
     }
 
