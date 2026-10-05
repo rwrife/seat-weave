@@ -114,7 +114,16 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Synthetic two"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Share"].tap()
         let deleteAll = app.buttons["delete-all-button"]
+        // Review chrome adds a section above Delete. SwiftUI List lazily
+        // realizes the bottom destructive row only after scrolling the
+        // front workspace list (not the event list mounted behind it).
+        for _ in 0..<8 where !deleteAll.isHittable {
+            let lists = app.collectionViews
+            XCTAssertGreaterThan(lists.count, 0)
+            lists.element(boundBy: lists.count - 1).swipeUp()
+        }
         XCTAssertTrue(deleteAll.waitForExistence(timeout: 5))
+        XCTAssertTrue(deleteAll.isHittable, "Delete all must remain reachable after review chrome")
         XCTAssertTrue(deleteAll.isEnabled)
         deleteAll.tap()
         let deleteEverything = app.buttons["Delete everything"]
