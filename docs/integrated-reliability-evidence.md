@@ -107,6 +107,13 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 37304700172 (head 29fe0c9): the same large-text seat-2 tap
+  failed despite clamping window-level drags to y=388..514; its trace
+  still alternated those drags with `Swipe up CollectionView` at the
+  collection center near the tab overlay. The next repair removes the
+  element-scoped non-sheet swipe path and requires fresh native proof;
+  without a failure-path hierarchy on this run, the exact selected tab
+  at failure is **not** asserted as a fact.
 - Run 37302205727 (head 6cd7d3e): failure-path hierarchy proved the
   `seat-Round1-2` hunt was actually on **Pairs**, not Tables: the gesture
   began at y=580, only 4 points above the enlarged tab bar (which spans

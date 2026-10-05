@@ -141,11 +141,15 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     // attempts — the synthesized swipe never reached the real scroll
     // view (the row stayed unrealized). The window-level coordinate
     // drag across the content band is the strategy already proven in
-    // `waitField` for exactly this stall (run 36465561808): it always
-    // synthesizes against the front-most window. Alternate the two so
-    // every second attempt is a band drag.
-    private var scrollCadence = 0
-
+    // `waitField` for exactly this stall (run 36465561808): it
+    // synthesizes against the front-most window. Run 37304700172 still
+    // failed with alternating CollectionView swipes: eliminate that
+    // competing gesture path in the next exact-head simulator run.
+    // The collection extends underneath the tab bar at AX5XL. Its
+    // synthesized element-scoped swipe begins near the dimming overlay
+    // (center y=517, overlay starts y=519) and can switch tabs even after
+    // app-coordinate drags were clamped. Use the unobscured band for all
+    // non-sheet scrolls; the sheet still receives its own gestures.
     private func scrollDownOnce(_ app: XCUIApplication) {
         let sheet = app.sheets.firstMatch
         if sheet.exists {
@@ -157,31 +161,11 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
             if sheetScroll.exists { sheetScroll.swipeUp(); return }
             return // Sheet without a scrollable surface: scrolling cannot help.
         }
-        scrollCadence += 1
-        let surface = frontScrollSurface(app)
-        if surface != app {
-            if scrollCadence % 2 == 0 {
-                surface.swipeUp()
-            } else {
-                contentBandDrag(app, downward: true)
-            }
-            return
-        }
         contentBandDrag(app, downward: true)
     }
 
     private func scrollUpOnce(_ app: XCUIApplication) {
         if app.sheets.firstMatch.exists { return }
-        scrollCadence += 1
-        let surface = frontScrollSurface(app)
-        if surface != app {
-            if scrollCadence % 2 == 0 {
-                surface.swipeDown()
-            } else {
-                contentBandDrag(app, downward: false)
-            }
-            return
-        }
         contentBandDrag(app, downward: false)
     }
 
