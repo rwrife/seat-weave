@@ -113,6 +113,7 @@ xcodebuild test \
   -scheme SeatWeave \
   -only-testing:SeatWeaveUITests/SeatWeaveLaunchTests \
   -only-testing:SeatWeaveUITests/SeatWeaveSeatingJourneyTests \
+  -only-testing:SeatWeaveUITests/SeatWeaveGuestEditingJourneyTests \
   -only-testing:SeatWeaveUITests/SeatWeaveShareJourneyTests \
   -only-testing:SeatWeaveUITests/SeatWeaveWorkspaceTransitionTests \
   -destination "platform=iOS Simulator,id=$simulator_udid" \
