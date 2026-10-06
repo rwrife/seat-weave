@@ -52,6 +52,22 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
 
         // Public preview: exactly the seated name, never the unseated one.
         app.tabBars.buttons["Share"].tap()
+        let reviewButton = app.buttons["review-plan-button"]
+        XCTAssertTrue(reviewButton.waitForExistence(timeout: 5))
+        reviewButton.tap()
+        XCTAssertTrue(app.navigationBars["Plan review"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Unseated guests (1)"].exists)
+        XCTAssertTrue(app.staticTexts["Empty seats (5) — informational"].exists)
+        let unseated = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Seat Basil — open guest")
+        ).firstMatch
+        XCTAssertTrue(unseated.waitForExistence(timeout: 5))
+        unseated.tap()
+        XCTAssertTrue(app.tabBars.buttons["Guests"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["selection.current"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Share"].tap()
+        // Returning from a host-only review still permits a draft; the
+        // existing public preview asserts Basil and warnings stay private.
         let shareButton = app.buttons["export-preview-button"]
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
         XCTAssertTrue(shareButton.isEnabled)
@@ -98,7 +114,16 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Synthetic two"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Share"].tap()
         let deleteAll = app.buttons["delete-all-button"]
+        // Review chrome adds a section above Delete. SwiftUI List lazily
+        // realizes the bottom destructive row only after scrolling the
+        // front workspace list (not the event list mounted behind it).
+        for _ in 0..<8 where !deleteAll.isHittable {
+            let lists = app.collectionViews
+            XCTAssertGreaterThan(lists.count, 0)
+            lists.element(boundBy: lists.count - 1).swipeUp()
+        }
         XCTAssertTrue(deleteAll.waitForExistence(timeout: 5))
+        XCTAssertTrue(deleteAll.isHittable, "Delete all must remain reachable after review chrome")
         XCTAssertTrue(deleteAll.isEnabled)
         deleteAll.tap()
         let deleteEverything = app.buttons["Delete everything"]

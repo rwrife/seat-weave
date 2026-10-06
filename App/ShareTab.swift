@@ -20,6 +20,7 @@ struct ShareTab: View {
     }
 
     @State private var previewBox: PreviewBox?
+    @State private var showReview = false
     @State private var showBackupSheet = false
     /// Fully built export waiting for the system save panel. The
     /// single-document `fileExporter` overload is the only one that
@@ -42,6 +43,19 @@ struct ShareTab: View {
 
     var body: some View {
         List {
+            Section("Ready-to-share review") {
+                Button("Review selected plan") { showReview = true }
+                    .disabled(model.selectedReview == nil)
+                    .accessibilityIdentifier("review-plan-button")
+                if let review = model.selectedReview {
+                    Text("\(review.unseated.count) unseated · \(review.emptySeats.count) empty seats (informational) · \(review.conflicts.count) conflicts · \(review.unresolved.count) unresolved")
+                        .font(.caption)
+                        .accessibilityIdentifier("review-summary")
+                }
+                Text("Review before sharing. You may deliberately share a draft; acknowledgement never changes a preference or the guest-facing file.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Public seating list") {
                 Button("Preview shared list") {
                     if let preview = model.exportSelectedPlan() {
@@ -85,6 +99,9 @@ struct ShareTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+        .sheet(isPresented: $showReview) {
+            PlanReviewSheet(onNavigate: { showReview = false })
         }
         .sheet(item: $previewBox) { box in
             ExportPreviewSheet(preview: box.preview) { kind in
@@ -198,6 +215,91 @@ struct ShareTab: View {
         guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
               size <= maxBytes else { return nil }
         return try? Data(contentsOf: url)
+    }
+}
+
+/// A host-only, actionable review. No review detail or acknowledgement is
+/// embedded in the public PDF/text; the export builder takes only the event
+/// and selected variant and has no acknowledgement parameter.
+struct PlanReviewSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let onNavigate: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let review = model.selectedReview {
+                    Section("Unseated guests (\(review.unseated.count))") {
+                        if review.unseated.isEmpty { Text("All guests seated.") }
+                        ForEach(review.unseated, id: \.id) { guest in
+                            Button("Seat \(guest.displayName) — open guest") {
+                                model.showGuestFromReview(guest.id)
+                                onNavigate()
+                            }
+                            .accessibilityIdentifier("review-unseated-\(guest.id.uuidString)")
+                        }
+                    }
+                    Section("Empty seats (\(review.emptySeats.count)) — informational") {
+                        if review.emptySeats.isEmpty { Text("No empty seats.") }
+                        ForEach(review.emptySeats, id: \.self) { seat in
+                            Button("\(seat.tableLabel), seat \(seat.number) — open table") {
+                                model.showTableFromReview(seat.tableID)
+                                onNavigate()
+                            }
+                            .accessibilityIdentifier("review-empty-\(seat.tableID.uuidString)-\(seat.number)")
+                        }
+                    }
+                    Section("Conflicting preferences (\(review.conflicts.count))") {
+                        if review.conflicts.isEmpty { Text("No conflicts.") }
+                        ForEach(review.conflicts, id: \.preferenceID) { evaluation in
+                            Button("Inspect conflict: \(evaluation.reason)") {
+                                model.showPreferenceFromReview(evaluation.preferenceID)
+                                onNavigate()
+                            }
+                            .accessibilityIdentifier("review-conflict-\(evaluation.preferenceID.uuidString)")
+                            if review.acknowledgedPreferenceIDs.contains(evaluation.preferenceID) {
+                                Text("Intentional conflict acknowledged; the preference is still conflicting.")
+                                    .font(.caption)
+                                Button("Revisit this conflict") {
+                                    model.revisitConflict(preferenceID: evaluation.preferenceID)
+                                }
+                                .accessibilityIdentifier("review-revisit-\(evaluation.preferenceID.uuidString)")
+                            } else {
+                                Button("Acknowledge intentional conflict") {
+                                    model.acknowledgeConflict(preferenceID: evaluation.preferenceID)
+                                }
+                                .accessibilityIdentifier("review-ack-\(evaluation.preferenceID.uuidString)")
+                            }
+                        }
+                    }
+                    Section("Unresolved preferences (\(review.unresolved.count))") {
+                        if review.unresolved.isEmpty { Text("None unresolved.") }
+                        ForEach(review.unresolved, id: \.preferenceID) { evaluation in
+                            Button("Inspect unresolved: \(evaluation.reason)") {
+                                model.showPreferenceFromReview(evaluation.preferenceID)
+                                onNavigate()
+                            }
+                            .accessibilityIdentifier("review-unresolved-\(evaluation.preferenceID.uuidString)")
+                        }
+                    }
+                    Section("Sharing decision") {
+                        Text("\(review.unacknowledgedConflicts) conflict(s) not acknowledged. Unseated guests and unresolved preferences stay outstanding even if a conflict is acknowledged. Empty seats alone do not block sharing.")
+                            .accessibilityIdentifier("review-decision")
+                        Text("You may share this intentional draft. Close this review and choose Preview shared list to inspect exactly what guests will see; private notes remain here.")
+                            .font(.caption)
+                        Button("Return to sharing") { dismiss() }
+                            .accessibilityIdentifier("review-return-to-share")
+                    }
+                }
+            }
+            .navigationTitle("Plan review")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
     }
 }
 

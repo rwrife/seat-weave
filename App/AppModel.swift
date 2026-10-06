@@ -49,6 +49,12 @@ final class AppModel {
     /// orientation changes and region switches must not reset it, and
     /// resizing never mutates assignments or focus.
     var focusedTableID: UUID?
+    /// Acknowledgements are host-only and session-local. Relaunch forces a
+    /// fresh review; edits prune keys immediately at the save boundary.
+    private(set) var reviewAcknowledgements: Set<ConflictAcknowledgement> = []
+    enum WorkspaceTab: Hashable { case guests, tables, pairs, plans, share }
+    var compactTab: WorkspaceTab = .guests
+    var regularTab: WorkspaceTab = .tables
     /// UI-test-only workspace-region override. `.auto` follows the
     /// environment's horizontal size class through `SeatingWorkspaceLayout`.
     var layoutOverride: WorkspaceLayoutOverride = .auto
@@ -170,6 +176,7 @@ final class AppModel {
                 return
             }
             controller = PersistentSeatingController(event: event, saver: StoreSaver(store: store))
+            reviewAcknowledgements = []
             let remembered = defaults.string(forKey: AppModel.lastVariantKey(eventID: eventID))
                 .flatMap(UUID.init(uuidString:))
             if let remembered, event.variant(remembered) != nil {
@@ -189,6 +196,9 @@ final class AppModel {
         selectedVariantID = nil
         selectedGuestID = nil
         focusedTableID = nil
+        reviewAcknowledgements = []
+        compactTab = .guests
+        regularTab = .tables
         layoutOverride = .auto
         refreshEventList()
     }
@@ -216,6 +226,10 @@ final class AppModel {
         do {
             try mutation(&controller)
             self.controller = controller
+            if let event = self.event {
+                reviewAcknowledgements = PlanReview.validAcknowledgements(
+                    event: event, acknowledged: reviewAcknowledgements)
+            }
         } catch {
             alertMessage = error.localizedDescription
         }
@@ -226,6 +240,10 @@ final class AppModel {
         do {
             try controller.undo()
             self.controller = controller
+            if let event = self.event {
+                reviewAcknowledgements = PlanReview.validAcknowledgements(
+                    event: event, acknowledged: reviewAcknowledgements)
+            }
         } catch {
             alertMessage = error.localizedDescription
         }
@@ -330,6 +348,42 @@ final class AppModel {
         }
         defaults.removeObject(forKey: AppModel.lastVariantKey(eventID: eventID))
         defaults.synchronize()
+    }
+
+    // MARK: - Host-only selected-plan review (issue #15)
+
+    var selectedReview: PlanReview? {
+        guard let event, let variant = selectedVariant else { return nil }
+        return PlanReview.make(event: event, variant: variant, acknowledged: reviewAcknowledgements)
+    }
+
+    func acknowledgeConflict(preferenceID: UUID) {
+        guard let key = selectedReview?.acknowledgementKeys[preferenceID] else { return }
+        reviewAcknowledgements.insert(key)
+    }
+
+    func revisitConflict(preferenceID: UUID) {
+        if let key = selectedReview?.acknowledgementKeys[preferenceID] {
+            reviewAcknowledgements.remove(key)
+        }
+    }
+
+    func showGuestFromReview(_ id: UUID) {
+        selectedGuestID = id
+        compactTab = .guests
+    }
+
+    func showTableFromReview(_ id: UUID) {
+        focusedTableID = id
+        compactTab = .tables
+        regularTab = .tables
+    }
+
+    func showPreferenceFromReview(_ id: UUID) {
+        if let preference = event?.preferences.first(where: { $0.id == id }) {
+            selectedGuestID = preference.firstGuestID
+        }
+        compactTab = .pairs
     }
 
     // MARK: - Derived summaries (compact workspace banner and comparison)
