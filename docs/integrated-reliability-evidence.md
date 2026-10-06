@@ -107,6 +107,14 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 37421115259 (head 15b6e1a): `SeatWeaveLargeTextJourneyTests` failed at
+  line 330 checking `waitAny(app, identifier: "roster-Aster")`. Root cause:
+  PR #23 merged guest editing, which changed roster row identifiers from
+  static `roster-<name>` to UUID-based `roster-<UUID>` with accessibility
+  label `"<name>, "`. The large-text journey was written before #23 and still
+  expected the old identifier. Updated `waitRoster` and `tapRoster` to
+  query via `rosterButton(app, name: ...)` matching label `CONTAINS "<name>, "`,
+  matching `SeatWeaveSeatingJourneyTests` and `SeatWeaveRegularWidthTests`.
 - Run 37304700172 (head 29fe0c9): the same large-text seat-2 tap
   failed despite clamping window-level drags to y=388..514; its trace
   still alternated those drags with `Swipe up CollectionView` at the

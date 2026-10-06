@@ -268,6 +268,36 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         element.tap()
     }
 
+    /// Issue #17 uses UUID-based roster identifiers so duplicate names
+    /// remain distinct. This synthetic journey has unique names; match the
+    /// row's combined accessibility label, not the obsolete name-based ID.
+    private func rosterButton(_ app: XCUIApplication, name: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "\(name), ")).firstMatch
+    }
+
+    private func waitRoster(_ app: XCUIApplication, name: String) -> XCUIElement {
+        let row = rosterButton(app, name: name)
+        let deadline = Date().addingTimeInterval(30)
+        var attempts = 0
+        while Date() < deadline {
+            if row.exists { return row }
+            attempts += 1
+            if attempts % 4 == 0 { scrollUpOnce(app) } else { scrollDownOnce(app) }
+        }
+        return row
+    }
+
+    private func tapRoster(_ app: XCUIApplication, name: String) {
+        let row = waitRoster(app, name: name)
+        XCTAssertTrue(row.exists, "roster row for \(name) missing after scrolling")
+        let deadline = Date().addingTimeInterval(25)
+        while Date() < deadline {
+            if row.isHittable { row.tap(); return }
+            nudgeTowardViewport(app, element: row)
+        }
+        XCTAssertTrue(row.isHittable, "roster row for \(name) never became tappable")
+    }
+
     /// Tab bar first (iPhone renders a bottom tab bar; the iOS 26 iPad
     /// tab bar may not carry the trait), plain button as fallback — the
     /// resolution rule proven by SeatWeaveRegularWidthTests.
@@ -327,12 +357,12 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         guestField.tap()
         guestField.typeText("Aster\n")
         tap(app, identifier: "add-guest-button")
-        XCTAssertTrue(waitAny(app, identifier: "roster-Aster").exists)
+        XCTAssertTrue(waitRoster(app, name: "Aster").exists)
 
         waitField(app, identifier: "add-guest-field").tap()
         app.textFields["add-guest-field"].typeText("Basil\n")
         tap(app, identifier: "add-guest-button")
-        XCTAssertTrue(waitAny(app, identifier: "roster-Basil").exists)
+        XCTAssertTrue(waitRoster(app, name: "Basil").exists)
 
         // One table (default six seats) on the Tables tab.
         tapTab(app, "Tables")
@@ -347,21 +377,21 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         // Assign Aster to seat 1 and Basil to seat 2 — list navigation
         // and taps only.
         tapTab(app, "Guests")
-        tap(app, identifier: "roster-Aster")
+        tapRoster(app, name: "Aster")
         tapTab(app, "Tables")
         tap(app, identifier: "seat-Round1-1")
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "seating.summary", containing: "1 seated"),
                       "first assignment did not register at accessibility text size")
 
         tapTab(app, "Guests")
-        tap(app, identifier: "roster-Basil")
+        tapRoster(app, name: "Basil")
         tapTab(app, "Tables")
         tap(app, identifier: "seat-Round1-2")
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "seating.summary", containing: "2 seated"))
 
         // Swap Aster and Basil, then undo the swap.
         tapTab(app, "Guests")
-        tap(app, identifier: "roster-Aster")
+        tapRoster(app, name: "Aster")
         tapTab(app, "Tables")
         tap(app, identifier: "seat-Round1-2")
         XCTAssertTrue(app.staticTexts["Swap seats?"].waitForExistence(timeout: 10),
