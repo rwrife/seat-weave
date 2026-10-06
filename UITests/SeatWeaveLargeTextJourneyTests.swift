@@ -245,6 +245,9 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         var attempts = 0
         while Date() < deadline {
             let resolved = candidates(app, identifier).first { $0.exists }
+            if identifier == "seat-Round1-2" {
+                print("SEAT2 attempt=\(attempts) band=\(contentBand(app)) frame=\(String(describing: resolved?.frame)) hittable=\(resolved?.isHittable ?? false)")
+            }
             if let resolved, resolved.isHittable {
                 resolved.tap()
                 return
@@ -264,6 +267,14 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
             }
         }
         let element = candidates(app, identifier).first { $0.exists } ?? app.buttons[identifier]
+        // One failure-path ground-truth capture: diagnose the active tab,
+        // overlays and scroll position instead of guessing another gesture.
+        print("FAILED TAP \(identifier); band=\(contentBand(app)); app=\(app.frame)")
+        print(app.debugDescription)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Unreachable \(identifier)"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
         XCTAssertTrue(element.isHittable, "\(identifier) never became tappable inside the active list's content band")
         element.tap()
     }
