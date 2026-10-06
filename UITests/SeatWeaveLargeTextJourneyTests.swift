@@ -123,15 +123,16 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
     private func contentBandDrag(_ app: XCUIApplication, downward: Bool) {
         let (top, bottom) = contentBand(app)
         let appFrame = app.frame
-        let startNorm = downward
-            ? (bottom - appFrame.minY) / appFrame.height
-            : (top - appFrame.minY) / appFrame.height
-        let endNorm = downward
-            ? (top - appFrame.minY) / appFrame.height
-            : (bottom - appFrame.minY) / appFrame.height
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startNorm))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endNorm))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        let mid = (top + bottom) / 2
+        // A gentle, controlled nudge of ~45 points (roughly half a row height)
+        // at a slow duration of 0.25s avoids triggering inertial fling momentum
+        // that skips over rows in the small ~130pt visible band at AX5XL.
+        let step: CGFloat = min(45, (bottom - top) * 0.35)
+        let startY = downward ? min(bottom - 5, mid + step) : max(top + 5, mid - step)
+        let endY = downward ? max(top + 5, mid - step) : min(bottom - 5, mid + step)
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - appFrame.minY) / appFrame.height))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - appFrame.minY) / appFrame.height))
+        start.press(forDuration: 0.25, thenDragTo: end)
     }
 
     // Run 36810913152 root cause (from the failing run's xcresult
@@ -237,7 +238,7 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         let origin = app.frame
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - origin.minY) / origin.height))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - origin.minY) / origin.height))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        start.press(forDuration: 0.25, thenDragTo: end)
     }
 
     private func tap(_ app: XCUIApplication, identifier: String, scroll: Bool = true) {
@@ -245,9 +246,6 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         var attempts = 0
         while Date() < deadline {
             let resolved = candidates(app, identifier).first { $0.exists }
-            if identifier == "seat-Round1-2" {
-                print("SEAT2 attempt=\(attempts) band=\(contentBand(app)) frame=\(String(describing: resolved?.frame)) hittable=\(resolved?.isHittable ?? false)")
-            }
             if let resolved, resolved.isHittable {
                 resolved.tap()
                 return
