@@ -98,7 +98,7 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
 
         // Seat Aster into seat 1: select on Guests, seat on Tables.
         selectTab(app, "Guests")
-        app.buttons["roster-Aster"].tap()
+        rosterButton(app, "Aster").tap()
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "selection.current", containing: "Aster"))
         selectTab(app, "Tables")
         XCTAssertTrue(app.buttons["seat-Round1-1"].waitForExistence(timeout: 5))
@@ -108,14 +108,14 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
 
         // Seat Basil into seat 2.
         selectTab(app, "Guests")
-        app.buttons["roster-Basil"].tap()
+        rosterButton(app, "Basil").tap()
         selectTab(app, "Tables")
         app.buttons["seat-Round1-2"].tap()
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "seating.summary", containing: "2 seated"))
 
         // Swap: select Aster, tap Basil's occupied seat -> confirm sheet.
         selectTab(app, "Guests")
-        app.buttons["roster-Aster"].tap()
+        rosterButton(app, "Aster").tap()
         selectTab(app, "Tables")
         app.buttons["seat-Round1-2"].tap()
         XCTAssertTrue(app.staticTexts["Swap seats?"].waitForExistence(timeout: 5))
@@ -141,7 +141,7 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
 
         // Unseat Aster from the Guests selection controls, then undo it.
         selectTab(app, "Guests")
-        app.buttons["roster-Aster"].tap()
+        rosterButton(app, "Aster").tap()
         XCTAssertTrue(app.buttons["unseat-button"].waitForExistence(timeout: 5))
         app.buttons["unseat-button"].tap()
         XCTAssertTrue(waitIdentifiedLabel(app, identifier: "seating.summary", containing: "1 seated"))
@@ -186,6 +186,17 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         field.tap()
         field.typeText("\(name)\n")
         app.buttons["add-guest-button"].tap()
-        XCTAssertTrue(app.buttons["roster-\(name)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(rosterButton(app, name).waitForExistence(timeout: 5))
     }
+
+    /// Issue #17: roster row identifiers are per-guest UUIDs now, so
+    /// journeys locate rows by the leading name in the row's combined
+    /// accessibility label ("<name>, <seat>"). Names in these journeys
+    /// are unique; the new duplicate-name coverage queries per-person
+    /// labels directly in SeatWeaveGuestEditingJourneyTests.
+    private func rosterButton(_ app: XCUIApplication, _ name: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "\(name), "))
+            .firstMatch
+    }
+
 }

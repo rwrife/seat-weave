@@ -94,13 +94,14 @@ struct CompactWorkspaceTabs: View {
 struct RegularWorkspaceSidebar: View {
     @Environment(AppModel.self) private var model
     @State private var deletionTarget: SeatingWorkspaceView.DeletionTarget?
+    @State private var renameTarget: RenameGuestBox?
 
     var body: some View {
         List {
             // Identical section content to the compact GuestsTab, so a
             // width change swaps regions without changing behaviour or
             // identifiers (single instance per region switch).
-            GuestsSectionContent(deletionTarget: $deletionTarget)
+            GuestsSectionContent(deletionTarget: $deletionTarget, renameTarget: $renameTarget)
             if let event = model.event, let variant = model.selectedVariant {
                 Section("Pair preferences") {
                     PairPreferencesContent(event: event, variant: variant)
@@ -112,6 +113,9 @@ struct RegularWorkspaceSidebar: View {
                 if model.selectedGuestID == target.id { model.selectedGuestID = nil }
                 deletionTarget = nil
             }
+        }
+        .sheet(item: $renameTarget) { box in
+            RenameGuestSheet(guestID: box.id) { renameTarget = nil }
         }
         .modifier(FailureAlertModifier())
     }
