@@ -277,6 +277,11 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
                     } else {
                         scrollDownOnce(app)
                     }
+                } else if identifier.hasPrefix("resize-") {
+                    // Resize follows all seat rows. The failure hierarchy in
+                    // run 37584965653 showed seats 4–6 and scroll value 56%:
+                    // the missing Resize row was still below the viewport.
+                    scrollDownOnce(app)
                 } else if attempts % 4 == 0 {
                     scrollUpOnce(app)
                 } else {

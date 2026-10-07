@@ -107,9 +107,19 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 37584965653 attempt 1 (head dfd6714): simulator enumeration timed out
+  twice before app build or tests. Same-SHA `--failed` rerun attempt 2 built
+  and reached the AX5XL journey; the seat-2 swap step passed, proving the
+  upward-direction repair, but `resize-Round1` never became tappable. Its
+  failure hierarchy shows Seats 4–6 with scroll value **56%**, so the resize
+  button is below the viewport. The generic 3-down/1-up recovery for missing
+  elements needlessly reverses progress at this tiny viewport; the resize
+  search now scrolls down only because that button follows every seat row.
+  Fresh exact-head native evidence is still required.
 - Run 37581217242 (head 27a82b7): pinned macOS build, SwiftData suites,
-  compact journeys (Smoke, Seating, GuestEditing, Share, WorkspaceTransition)
-  and regular-width tests completed. `SeatWeaveLargeTextJourneyTests` reached
+  compact journeys (Launch, Seating, GuestEditing, Share, WorkspaceTransition)
+  completed. Regular-width tests were not reached after the large-text failure.
+  `SeatWeaveLargeTextJourneyTests` reached
   the second assignment (2 seated), but the subsequent swap tap on
   `seat-Round1-2` failed after 25 seconds.
   Root cause from the failure-path element tree: after Aster was assigned to
