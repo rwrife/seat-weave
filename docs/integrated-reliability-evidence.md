@@ -107,6 +107,23 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 37581217242 (head 27a82b7): pinned macOS build, SwiftData suites,
+  compact journeys (Smoke, Seating, GuestEditing, Share, WorkspaceTransition)
+  and regular-width tests completed. `SeatWeaveLargeTextJourneyTests` reached
+  the second assignment (2 seated), but the subsequent swap tap on
+  `seat-Round1-2` failed after 25 seconds.
+  Root cause from the failure-path element tree: after Aster was assigned to
+  seat 1 and Basil to seat 2, the six-page list retained its scroll position;
+  the visible elements were Seat 6 (y=291), Resize Round1 (y=433), and Add
+  table (y=555), with vertical scroll bar at **92%**. `seat-Round1-2` was
+  ABOVE the fold, not below it. The generic fallback was scrolling down three
+  times for every one scroll up, which could never recover when the list was
+  already past the target.
+  Repair: `tap()` now derives scroll direction for seat identifiers
+  (`seat-<tablePrefix>-<N>`) by comparing the requested seat number against the
+  currently visible seat buttons on that table, scrolling upward when the target
+  precedes the visible window. This is a hypothesis pending native evidence;
+  simulator journeys remain simulator evidence, not physical-device verification.
 - Run 37431466002 (head ee377b6): pinned macOS build and earlier UI journeys
   completed, but AX5XL `seat-Round1-2` failed after the 25-second tap hunt.
   The one-shot failure hierarchy confirms the Tables tab remained selected,

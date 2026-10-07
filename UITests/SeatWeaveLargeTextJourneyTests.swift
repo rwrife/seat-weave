@@ -259,10 +259,25 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
                 attempts += 1
                 if let resolved {
                     nudgeTowardViewport(app, element: resolved)
+                } else if let separator = identifier.lastIndex(of: "-"),
+                          let targetSeat = Int(identifier[identifier.index(after: separator)...]),
+                          identifier.hasPrefix("seat-") {
+                    // The table list retains its offset across tab switches.
+                    // Run 37581217242 assigned both guests, then hunted seat 2
+                    // for the swap while already at seat 6 (scroll value 92%).
+                    // A 3-down/1-up cadence can never recover from that state.
+                    let prefix = String(identifier[...separator])
+                    let visibleSeats = frontScrollSurface(app).buttons.allElementsBoundByIndex
+                        .compactMap { button -> Int? in
+                            guard button.identifier.hasPrefix(prefix) else { return nil }
+                            return Int(button.identifier.dropFirst(prefix.count))
+                        }
+                    if let firstSeat = visibleSeats.min(), targetSeat < firstSeat {
+                        scrollUpOnce(app)
+                    } else {
+                        scrollDownOnce(app)
+                    }
                 } else if attempts % 4 == 0 {
-                    // Missing means lazy loading removed the row. Keep the
-                    // proven 3-down / 1-up cadence from waitAny so the hunt
-                    // progresses downward but still recovers from overscroll.
                     scrollUpOnce(app)
                 } else {
                     scrollDownOnce(app)
