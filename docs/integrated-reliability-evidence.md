@@ -107,6 +107,17 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 37431466002 (head ee377b6): pinned macOS build and earlier UI journeys
+  completed, but AX5XL `seat-Round1-2` failed after the 25-second tap hunt.
+  The one-shot failure hierarchy confirms the Tables tab remained selected,
+  and the six-page list's vertical scrollbar reached **100%**: the seat was
+  above the viewport, not missing from the model or obscured by a tab switch.
+  A `press(forDuration: 0.25, thenDragTo:)` controls only the initial hold;
+  the subsequent gesture can still fling the short unobscured content band
+  to the end. The next exact-head native run uses XCTest's slow drag velocity
+  with a short final hold. This is a hypothesis pending native evidence, not
+  a passed large-text journey. The new main also contains selected-plan review
+  (#15); it is reconciled on this branch without dropping either feature.
 - Run 37421115259 (head 15b6e1a): `SeatWeaveLargeTextJourneyTests` failed at
   line 330 checking `waitAny(app, identifier: "roster-Aster")`. Root cause:
   PR #23 merged guest editing, which changed roster row identifiers from

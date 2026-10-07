@@ -124,15 +124,17 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         let (top, bottom) = contentBand(app)
         let appFrame = app.frame
         let mid = (top + bottom) / 2
-        // A gentle, controlled nudge of ~45 points (roughly half a row height)
-        // at a slow duration of 0.25s avoids triggering inertial fling momentum
-        // that skips over rows in the small ~130pt visible band at AX5XL.
+        // A short ~45-point drag at XCTest's slow velocity avoids flinging
+        // past rows in the ~130pt unobscured band at AX5XL.
         let step: CGFloat = min(45, (bottom - top) * 0.35)
         let startY = downward ? min(bottom - 5, mid + step) : max(top + 5, mid - step)
         let endY = downward ? max(top + 5, mid - step) : min(bottom - 5, mid + step)
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - appFrame.minY) / appFrame.height))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - appFrame.minY) / appFrame.height))
-        start.press(forDuration: 0.25, thenDragTo: end)
+        // Press duration controls the initial hold, not drag velocity.
+        // The default fast drag flung this list to 100% in run 37431466002.
+        start.press(forDuration: 0.25, thenDragTo: end,
+                    withVelocity: .slow, thenHoldForDuration: 0.1)
     }
 
     // Run 36810913152 root cause (from the failing run's xcresult
@@ -238,7 +240,10 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         let origin = app.frame
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - origin.minY) / origin.height))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - origin.minY) / origin.height))
-        start.press(forDuration: 0.25, thenDragTo: end)
+        // Press duration controls the initial hold, not drag velocity.
+        // The default fast drag flung this list to 100% in run 37431466002.
+        start.press(forDuration: 0.25, thenDragTo: end,
+                    withVelocity: .slow, thenHoldForDuration: 0.1)
     }
 
     private func tap(_ app: XCUIApplication, identifier: String, scroll: Bool = true) {
