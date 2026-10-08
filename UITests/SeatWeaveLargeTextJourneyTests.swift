@@ -246,8 +246,9 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
                     withVelocity: .slow, thenHoldForDuration: 0.1)
     }
 
-    private func tap(_ app: XCUIApplication, identifier: String, scroll: Bool = true) {
-        let deadline = Date().addingTimeInterval(25)
+    private func tap(_ app: XCUIApplication, identifier: String, scroll: Bool = true,
+                     timeout: TimeInterval = 25) {
+        let deadline = Date().addingTimeInterval(timeout)
         var attempts = 0
         while Date() < deadline {
             let resolved = candidates(app, identifier).first { $0.exists }
@@ -277,10 +278,13 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
                     } else {
                         scrollDownOnce(app)
                     }
-                } else if identifier.hasPrefix("resize-") {
+                } else if identifier.hasPrefix("resize-") || identifier == "export-preview-button" {
                     // Resize follows all seat rows. The failure hierarchy in
                     // run 37584965653 showed seats 4–6 and scroll value 56%:
                     // the missing Resize row was still below the viewport.
+                    // Likewise, on the Share tab with issue #15's review section,
+                    // export-preview-button follows the review card at value 35%
+                    // (run 37588997187); generic 3-down/1-up rewound progress.
                     scrollDownOnce(app)
                 } else if attempts % 4 == 0 {
                     scrollUpOnce(app)
@@ -476,7 +480,9 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
 
         // Public export preview: the privacy contract holds at this size.
         tapTab(app, "Share")
-        tap(app, identifier: "export-preview-button")
+        // The host-only review card adds several AX-size pages before export.
+        // Keep small, overlay-safe drags; allow this known later row more time.
+        tap(app, identifier: "export-preview-button", timeout: 60)
         let exportText = app.staticTexts["export-text"]
         XCTAssertTrue(exportText.waitForExistence(timeout: 10),
                       "export preview unusable at accessibility text size")

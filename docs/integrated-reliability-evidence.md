@@ -107,6 +107,15 @@ conversation once the run completes; the merge only happens on green.
 
 ## CI repairs
 
+- Run 37588997187 (head 90992c9): exact-head pinned iOS job compiled the app,
+  completed compact journeys and the AX5XL create/assign/swap/undo/resize/
+  duplicate/relaunch path, but failed at `export-preview-button` before
+  regular-width tests. The failure-path hierarchy showed **Share selected**,
+  review rows visible and its eight-page List at 35% scroll; the export
+  action follows the review section. The generic 3-down/1-up hunt reversed
+  progress every fourth attempt. The export hunt now scrolls only toward
+  later rows with a bounded 60-second deadline; fresh exact-head native
+  success is required before merge. This is not physical-device evidence.
 - Run 37584965653 attempt 1 (head dfd6714): simulator enumeration timed out
   twice before app build or tests. Same-SHA `--failed` rerun attempt 2 built
   and reached the AX5XL journey; the seat-2 swap step passed, proving the
