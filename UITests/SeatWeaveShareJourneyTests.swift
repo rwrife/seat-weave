@@ -96,7 +96,18 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
 
         // Full backup requires reading the privacy warning first.
-        app.buttons["backup-export-button"].tap()
+        // The Share list lazily realizes sections below the new printable/PDF
+        // cards; swipe until the backup button is realized and hittable.
+        let backupButton = app.buttons["backup-export-button"]
+        for _ in 0..<6 where !backupButton.isHittable {
+            let lists = app.collectionViews
+            if lists.count > 0 {
+                lists.element(boundBy: lists.count - 1).swipeUp()
+            }
+        }
+        XCTAssertTrue(backupButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(backupButton.isHittable, "Backup export must remain reachable after PDF controls")
+        backupButton.tap()
         let privacy = app.staticTexts["backup-privacy-warning"]
         XCTAssertTrue(privacy.waitForExistence(timeout: 5))
         XCTAssertTrue(privacy.label.contains("preferences"),
