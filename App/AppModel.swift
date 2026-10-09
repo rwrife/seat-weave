@@ -265,13 +265,17 @@ final class AppModel {
     /// Preview of the guest-facing list for the currently selected plan.
     /// Nil (plus an alert) when the selection is missing or broken; the
     /// returned warnings never enter the shared text.
-    func exportSelectedPlan() -> PublicExportPreview? {
+    func exportSelectedPlan(
+        layout: PublicExportLayout = .tableOrder,
+        paperSize: PublicExportPaperSize = .letter
+    ) -> PublicExportPreview? {
         guard let event, let selectedVariantID else {
             alertMessage = "No plan selected"
             return nil
         }
         do {
-            return try PublicExportBuilder.preview(event: event, variantID: selectedVariantID)
+            return try PublicExportBuilder.preview(event: event, variantID: selectedVariantID,
+                                                   layout: layout, paperSize: paperSize)
         } catch {
             alertMessage = error.localizedDescription
             return nil

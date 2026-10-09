@@ -85,6 +85,13 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         )
         XCTAssertTrue(warning.element(boundBy: 0).waitForExistence(timeout: 5))
 
+        app.buttons["export-preview-pdf"].tap()
+        XCTAssertTrue(app.navigationBars["PDF preview"].waitForExistence(timeout: 8))
+        let pdfScreenshot = XCTAttachment(screenshot: app.screenshot())
+        pdfScreenshot.name = "Synthetic shared PDF preview"
+        pdfScreenshot.lifetime = .keepAlways
+        add(pdfScreenshot)
+        app.buttons["close-pdf-preview"].tap()
         app.buttons["close-export-preview"].tap()
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
 
