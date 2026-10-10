@@ -12,3 +12,9 @@ US Letter and A4 are explicit choices. The native renderer measures and wraps ea
 - Exact-head pinned macOS native validation: pending. CI must measure Xcode 26.0.1/17A400 and SDK 26.0, run the Share preview journey, generate four synthetic multipage PDFs plus an empty-plan PDF using the actual app renderer, and check page sizes, repeated page numbers, all 40 synthetic markers exactly once and privacy exclusions. It uploads PDFs and first/last page PNGs for visual review.
 - Representative multipage PDF visual inspection, native test results and exact-head provenance remain pending. Issue #20 remains open; PR uses `Refs #20` until these gates pass.
 - No physical device, signing, TestFlight or manual VoiceOver evidence is claimed.
+
+## CI repair — 2026-10-10
+
+Run [37935907617](https://github.com/rwrife/seat-weave/actions/runs/37935907617) measured Xcode 26.0.1 (17A400), SDK 26.0, built the app and passed all five compact simulator journeys. It then failed at `pdf_fixtures`: the simulator app produced no PDF files. The hand-authored project had no `SWIFT_ACTIVE_COMPILATION_CONDITIONS` for Debug, and its compiler invocation lacked `-D DEBUG`; both fixture entry point and writer were compiled out by `#if DEBUG`.
+
+The project now defines `DEBUG` only for Debug, preserving the Release exclusion. A configuration regression test fails on the original project and passes with this repair. Fresh exact-head native PDF generation, large-text/regular journeys and visual inspection remain required; the earlier compact pass does not validate the repaired head.
