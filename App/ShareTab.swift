@@ -448,7 +448,8 @@ enum SeatingPDFRenderer {
                     PublicSeatingExport.Row(tableLabel: "Round \(($0 - 1) % 6 + 1)",
                         seatNumber: ($0 - 1) / 6 + 1,
                         displayName: String(format: "SYNTHETIC%02d", $0) + " " +
-                            String(repeating: "Long Unicode Zoë Nguyễn 李 👩🏽‍💻 ", count: 5))
+                            String(repeating: "Long Unicode Zoë Nguyễn 李 👩🏽‍💻 ", count: 5) +
+                            String(format: " END%02d", $0))
                 }
                 let export = PublicSeatingExport(eventTitle: "Synthetic print verification",
                     planName: "Selected plan", layout: layout, paperSize: paper, rows: rows)
@@ -490,11 +491,11 @@ enum SeatingPDFRenderer {
         // truncated in the heading only; every guest row remains complete.
         let available = bounds.height - 2 * margin - 70
         let capacity = max(1, Int(available / lineHeight))
-        let allLines = (export.rows.isEmpty ? ["No guests seated yet."] :
-            export.rows.flatMap { lines(PublicPDFLayout.line(for: $0, layout: export.layout)) })
-        let pages = stride(from: 0, to: allLines.count, by: capacity).map {
-            Array(allLines[$0..<min($0 + capacity, allLines.count)])
+        let rowLines: [[String]] = export.rows.map {
+            lines(PublicPDFLayout.line(for: $0, layout: export.layout))
         }
+        let pages: [[String]] = export.rows.isEmpty ? [["No guests seated yet."]] :
+            PublicPDFLayout.paginateLines(rowLines, capacity: capacity)
         let renderer = UIGraphicsPDFRenderer(bounds: bounds)
         return renderer.pdfData { context in
             for (index, page) in pages.enumerated() {

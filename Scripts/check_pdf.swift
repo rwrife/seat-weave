@@ -34,8 +34,26 @@ for layout in ["tableOrder", "alphabeticalLookup"] {
         }
         for number in 1...40 {
             let marker = String(format: "SYNTHETIC%02d", number)
+            let endMarker = String(format: "END%02d", number)
             precondition(contents.components(separatedBy: marker).count == 2,
                          "Missing/duplicated guest \(marker) in \(name)")
+            let pageContainingMarker = (0..<doc.pageCount).first {
+                (doc.page(at: $0)?.string ?? "").contains(marker)
+            }
+            let pageContainingEnd = (0..<doc.pageCount).first {
+                (doc.page(at: $0)?.string ?? "").contains(endMarker)
+            }
+            precondition(contents.components(separatedBy: endMarker).count == 2 &&
+                         pageContainingMarker == pageContainingEnd,
+                         "Guest \(marker) split across page boundaries in \(name)")
+            if layout == "alphabeticalLookup", let index = pageContainingEnd {
+                let text = doc.page(at: index)?.string ?? ""
+                let suffix = text.components(separatedBy: endMarker)[1]
+                    .components(separatedBy: "SYNTHETIC")[0]
+                let compact = suffix.filter { !$0.isWhitespace }
+                precondition(compact.contains("Round\((number - 1) % 6 + 1),Seat\((number - 1) / 6 + 1)"),
+                             "Guest \(marker) table/seat suffix split across pages in \(name)")
+            }
         }
         precondition(!contents.localizedCaseInsensitiveContains("preference") &&
                      !contents.localizedCaseInsensitiveContains("unseated") &&

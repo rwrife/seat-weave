@@ -358,6 +358,24 @@ public enum PublicPDFLayout {
     /// Rows per page chosen for the fixed page layout.
     public static let rowsPerPage = 24
 
+    /// Pack measured row lines without splitting a guest across pages.
+    /// ponytail: A single row taller than a page is split; it cannot fit intact.
+    public static func paginateLines(_ rows: [[String]], capacity: Int) -> [[String]] {
+        precondition(capacity > 0)
+        var pages: [[String]] = [[]]
+        for row in rows {
+            guard !row.isEmpty else { continue }
+            if pages[pages.count - 1].count + row.count > capacity && !pages[pages.count - 1].isEmpty {
+                pages.append([])
+            }
+            for line in row {
+                if pages[pages.count - 1].count == capacity { pages.append([]) }
+                pages[pages.count - 1].append(line)
+            }
+        }
+        return pages
+    }
+
     /// Formats the single row line for print based on layout.
     public static func line(for row: PublicSeatingExport.Row, layout: PublicExportLayout) -> String {
         switch layout {
