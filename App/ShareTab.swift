@@ -81,11 +81,13 @@ struct ShareTab: View {
                     Text("Table-by-table").tag(PublicExportLayout.tableOrder)
                     Text("Alphabetical guest lookup").tag(PublicExportLayout.alphabeticalLookup)
                 }
+                .pickerStyle(.menu)
                 .accessibilityIdentifier("export-layout-picker")
                 Picker("Paper size", selection: $exportPaperSize) {
                     Text("US Letter").tag(PublicExportPaperSize.letter)
                     Text("A4").tag(PublicExportPaperSize.a4)
                 }
+                .pickerStyle(.menu)
                 .accessibilityIdentifier("export-paper-size-picker")
                 Button("Preview shared list") {
                     if let preview = model.exportSelectedPlan(layout: exportLayout, paperSize: exportPaperSize) {

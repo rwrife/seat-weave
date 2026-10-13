@@ -66,6 +66,10 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Guests"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["selection.current"].waitForExistence(timeout: 5))
         app.tabBars.buttons["Share"].tap()
+        // Select both export controls in the real Share screen. The chosen
+        // layout changes row order/format, while paper size changes PDF bounds.
+        chooseExportOption(app, picker: "export-layout-picker", option: "Alphabetical guest lookup")
+        chooseExportOption(app, picker: "export-paper-size-picker", option: "A4")
         // Returning from a host-only review still permits a draft; the
         // existing public preview asserts Basil and warnings stay private.
         let shareButton = app.buttons["export-preview-button"]
@@ -74,6 +78,8 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         shareButton.tap()
         let exportText = app.staticTexts["export-text"]
         XCTAssertTrue(exportText.waitForExistence(timeout: 5))
+        XCTAssertTrue(exportText.label.contains("Aster — Round1, Seat 1"),
+                      "the picked alphabetical lookup format must reach the shared text")
         XCTAssertTrue(exportText.label.contains("Aster"))
         XCTAssertFalse(exportText.label.contains("Basil"),
                        "unseated guests must never reach the shared list")
@@ -152,6 +158,29 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.buttons["create-event-button"].exists)
         XCTAssertFalse(app.buttons["open-event-Synthetic share"].exists)
         XCTAssertFalse(app.buttons["open-event-Synthetic two"].exists)
+    }
+
+    @MainActor
+    private func chooseExportOption(_ app: XCUIApplication, picker identifier: String, option label: String) {
+        let trigger = app.buttons[identifier]
+        XCTAssertTrue(trigger.waitForExistence(timeout: 5), "Missing picker button \(identifier)")
+        trigger.tap()
+        let menuOption = app.buttons[label]
+        if menuOption.waitForExistence(timeout: 2) {
+            menuOption.tap()
+            return
+        }
+        let fallback = app.menuItems[label]
+        if fallback.waitForExistence(timeout: 2) {
+            fallback.tap()
+            return
+        }
+        let sheetOption = app.sheets.buttons[label]
+        if sheetOption.waitForExistence(timeout: 2) {
+            sheetOption.tap()
+            return
+        }
+        XCTFail("Failed to select option \(label) from picker \(identifier)")
     }
 
     @MainActor

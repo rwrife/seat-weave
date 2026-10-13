@@ -22,3 +22,8 @@ The project now defines `DEBUG` only for Debug, preserving the Release exclusion
 ## Pagination repair — 2026-10-11
 
 Exact-head run [38029569642](https://github.com/rwrife/seat-weave/actions/runs/38029569642) passed on Xcode 26.0.1 (17A400), SDK 26.0; provenance expected/actual `55e3673bfa54cef539e67fd65884488a742fd545`, phase complete, exit 0. Native app, compact/large-text/regular journeys and four 40-guest PDFs plus empty-plan PDF passed content checks. But PDF text inspection found guest rows straddling pages. Marker-count checks missed this because they flattened the document. The renderer now paginates whole measured guest rows; a row taller than one page is the sole documented split exception. Domain regression tests exercise the page-boundary/oversized cases. Native fixtures append a distinct end marker to each synthetic name; PDFKit checks start and end appear on the same page, across both layouts and papers. Linux Swift 6.0 package tests: 77 passed; Python helper tests: 32 passed. These Linux checks do not prove native rendering. Fresh exact-head native results and visual review are still required before merge.
+
+## Share journey picker coverage — 2026-10-13
+
+PR #26 exact-head run 38115964222 verified pagination, PDFKit content checks, and geometric non-overlap across all 17 pages. However, the Share UI journey exercised only default options. The journey now explicitly interacts with the layout picker (`Alphabetical guest lookup`) and paper picker (`A4`), and asserts that the preview text reflects the chosen lookup format (`<Guest> — <Table>, Seat <N>`).
+
