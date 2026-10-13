@@ -27,3 +27,6 @@ Exact-head run [38029569642](https://github.com/rwrife/seat-weave/actions/runs/3
 
 PR #26 exact-head run 38115964222 verified pagination, PDFKit content checks, and geometric non-overlap across all 17 pages. However, the Share UI journey exercised only default options. The journey now explicitly interacts with the layout picker (`Alphabetical guest lookup`) and paper picker (`A4`), and asserts that the preview text reflects the chosen lookup format (`<Guest> — <Table>, Seat <N>`).
 
+## Native rerun
+
+Pending exact-head CI; Linux parsing and package tests are not iOS typecheck or simulator evidence.
