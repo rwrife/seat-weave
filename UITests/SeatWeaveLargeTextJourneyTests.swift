@@ -124,8 +124,8 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         let (top, bottom) = contentBand(app)
         let appFrame = app.frame
         let mid = (top + bottom) / 2
-        // A short ~45-point drag at XCTest's slow velocity avoids flinging
-        // past rows in the ~130pt unobscured band at AX5XL.
+        // A short drag at XCTest's slow velocity avoids flinging past rows
+        // in the ~130pt unobscured band at AX5XL.
         let step: CGFloat = min(45, (bottom - top) * 0.35)
         let startY = downward ? min(bottom - 5, mid + step) : max(top + 5, mid - step)
         let endY = downward ? max(top + 5, mid - step) : min(bottom - 5, mid + step)
@@ -480,9 +480,9 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
 
         // Public export preview: the privacy contract holds at this size.
         tapTab(app, "Share")
-        // The host-only review card adds several AX-size pages before export.
-        // Keep small, overlay-safe drags; allow this known later row more time.
-        tap(app, identifier: "export-preview-button", timeout: 60)
+        // The host-only review card plus printable layout and paper pickers
+        // add several AX-size pages before export. Allow this known later row more time.
+        tap(app, identifier: "export-preview-button", timeout: 90)
         let exportText = app.staticTexts["export-text"]
         XCTAssertTrue(exportText.waitForExistence(timeout: 10),
                       "export preview unusable at accessibility text size")
