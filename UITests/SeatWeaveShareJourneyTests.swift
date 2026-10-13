@@ -120,8 +120,14 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
                       "backup warning must name the private data it carries")
         app.buttons["Cancel"].tap()
 
-        // Deleting the open event pops back to the event list.
-        app.buttons["delete-event-button"].tap()
+        // Deletion lives below the backup card in the lazy Share list.
+        let deleteButton = app.buttons["delete-event-button"]
+        for _ in 0..<6 where !deleteButton.isHittable {
+            let lists = app.collectionViews
+            if lists.count > 0 { lists.element(boundBy: lists.count - 1).swipeUp() }
+        }
+        XCTAssertTrue(deleteButton.isHittable, "Delete event must remain reachable after backup dismissal")
+        deleteButton.tap()
         let deleteAction = app.buttons["Delete event"]
         XCTAssertTrue(deleteAction.waitForExistence(timeout: 5))
         deleteAction.tap()
