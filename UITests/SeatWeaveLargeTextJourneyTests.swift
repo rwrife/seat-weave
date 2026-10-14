@@ -129,13 +129,16 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         let step: CGFloat = min(45, (bottom - top) * 0.35)
         let startY = downward ? min(bottom - 5, mid + step) : max(top + 5, mid - step)
         let endY = downward ? max(top + 5, mid - step) : min(bottom - 5, mid + step)
-        // Share's menu-style export pickers span the center of the narrow
-        // AX5XL content band and steal the pan: run 38374520424 stalled at
-        // scroll value 58% through the whole 90s budget. Start drags in the
-        // List gutter instead (outside the rows, away from the system
-        // edge-swipe) whenever those pickers are on screen.
-        let gutterX: CGFloat = app.buttons["export-layout-picker"].exists
-            ? (appFrame.width - 8) / appFrame.width
+        // Share's menu-style export pickers span x 32–340 across the narrow
+        // AX5XL content band and steal the center pan (menu open instead of
+        // scroll): run 38374520424 froze at 58%. The right edge is no good
+        // either — the accessibility scroll bar container spans x 342–372
+        // and swallowed the drag in run 38520353799 (value pinned at 24%).
+        // Drag in the 16–32pt cell inset gutter instead: outside every
+        // control's hit region, clear of the bar, beyond the ~10pt system
+        // edge-swipe. Plain buttons (seat rows) never claim the pan.
+        let gutterX: CGFloat = app.tabBars.buttons["Share"].isSelected
+            ? 24 / appFrame.width
             : 0.5
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - appFrame.minY) / appFrame.height))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (endY - appFrame.minY) / appFrame.height))
@@ -245,11 +248,11 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         }
         // Use screen coordinates on the app rather than percentages of
         // the CollectionView: its frame extends UNDER the tab bar on AX5XL.
-        // Same gutter rule as contentBandDrag: the Share export pickers
-        // would claim a center-anchored nudge.
+        // Same Share-tab gutter rule as contentBandDrag: menu-style export
+        // pickers would claim a center-anchored nudge there.
         let origin = app.frame
-        let gutterX: CGFloat = app.buttons["export-layout-picker"].exists
-            ? (origin.width - 8) / origin.width
+        let gutterX: CGFloat = app.tabBars.buttons["Share"].isSelected
+            ? 24 / origin.width
             : 0.5
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - origin.minY) / origin.height))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (endY - origin.minY) / origin.height))
@@ -494,8 +497,10 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         // Public export preview: the privacy contract holds at this size.
         tapTab(app, "Share")
         // The host-only review card plus printable layout and paper pickers
-        // add several AX-size pages before export. Allow this known later row more time.
-        tap(app, identifier: "export-preview-button", timeout: 90)
+        // add several AX-size pages before export. Run 38520353799 proved
+        // each gutter drag costs ~9 s end to end and advances ~75 pt of an
+        // 11-page list; ~20 effective drags are needed. Budget for that.
+        tap(app, identifier: "export-preview-button", timeout: 240)
         let exportText = app.staticTexts["export-text"]
         XCTAssertTrue(exportText.waitForExistence(timeout: 10),
                       "export preview unusable at accessibility text size")
