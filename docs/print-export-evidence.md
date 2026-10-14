@@ -27,6 +27,10 @@ Exact-head run [38029569642](https://github.com/rwrife/seat-weave/actions/runs/3
 
 PR #26 exact-head run 38115964222 verified pagination, PDFKit content checks, and geometric non-overlap across all 17 pages. However, the Share UI journey exercised only default options. The journey now explicitly interacts with the layout picker (`Alphabetical guest lookup`) and paper picker (`A4`), and asserts that the preview text reflects the chosen lookup format (`<Guest> — <Table>, Seat <N>`).
 
+## Large-text scroll stall — 2026-10-14
+
+Exact-head run [38374520424](https://github.com/rwrife/seat-weave/actions/runs/38374520424) measured Xcode 26.0.1 (17A400), SDK 26.0; four compact journeys and the new Share picker journey passed. The AX5XL journey then failed at `export-preview-button` after its 90 s budget. Its failure hierarchy showed the new menu-style `Guest-facing layout` picker mid-band at y 376–617 and `Paper size` at y 620, with the list's scroll bar frozen at 58% for the whole budget: the center-anchored band drags landed on the picker buttons instead of panning the List. Both drag helpers now start inside the List's right gutter (app width − 8 pt, outside the padded row content and away from the left edge-swipe) whenever the export picker exists, leaving every other screen's proven center drag untouched. This is still an unproven local theory until the next exact-head native run.
+
 ## Native rerun
 
 Pending exact-head CI; Linux parsing and package tests are not iOS typecheck or simulator evidence.

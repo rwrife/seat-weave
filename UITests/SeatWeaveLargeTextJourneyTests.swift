@@ -129,8 +129,16 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         let step: CGFloat = min(45, (bottom - top) * 0.35)
         let startY = downward ? min(bottom - 5, mid + step) : max(top + 5, mid - step)
         let endY = downward ? max(top + 5, mid - step) : min(bottom - 5, mid + step)
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - appFrame.minY) / appFrame.height))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - appFrame.minY) / appFrame.height))
+        // Share's menu-style export pickers span the center of the narrow
+        // AX5XL content band and steal the pan: run 38374520424 stalled at
+        // scroll value 58% through the whole 90s budget. Start drags in the
+        // List gutter instead (outside the rows, away from the system
+        // edge-swipe) whenever those pickers are on screen.
+        let gutterX: CGFloat = app.buttons["export-layout-picker"].exists
+            ? (appFrame.width - 8) / appFrame.width
+            : 0.5
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - appFrame.minY) / appFrame.height))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (endY - appFrame.minY) / appFrame.height))
         // Press duration controls the initial hold, not drag velocity.
         // The default fast drag flung this list to 100% in run 37431466002.
         start.press(forDuration: 0.25, thenDragTo: end,
@@ -237,9 +245,14 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         }
         // Use screen coordinates on the app rather than percentages of
         // the CollectionView: its frame extends UNDER the tab bar on AX5XL.
+        // Same gutter rule as contentBandDrag: the Share export pickers
+        // would claim a center-anchored nudge.
         let origin = app.frame
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - origin.minY) / origin.height))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - origin.minY) / origin.height))
+        let gutterX: CGFloat = app.buttons["export-layout-picker"].exists
+            ? (origin.width - 8) / origin.width
+            : 0.5
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - origin.minY) / origin.height))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (endY - origin.minY) / origin.height))
         // Press duration controls the initial hold, not drag velocity.
         // The default fast drag flung this list to 100% in run 37431466002.
         start.press(forDuration: 0.25, thenDragTo: end,
