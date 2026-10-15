@@ -378,7 +378,6 @@ struct TablesTab: View {
         GeometryReader { geometry in
             let side = min(geometry.size.width, geometry.size.height)
             let radius = side / 2 - 80
-            let evaluations = RuleEngine.evaluate(event: event, variant: variant)
             ZStack {
                 Circle()
                     .strokeBorder(.secondary, lineWidth: 2)
@@ -389,42 +388,10 @@ struct TablesTab: View {
                     .frame(width: side / 3)
                     .accessibilityHidden(true)
                 ForEach(1...table.seatCount, id: \.self) { seatNumber in
-                    let guestID = variant.occupant(tableID: table.id, seatNumber: seatNumber)
-                    let guest = guestID.flatMap { event.guest($0) }
-                    let selected = guestID != nil && model.selectedGuestID == guestID
-                    let statuses = evaluations.filter { evaluation in
-                        guestID.map { evaluation.guestIDs.contains($0) } ?? false
-                    }
-                    let conflicts = statuses.filter { $0.status == .conflict }.count
-                    let unresolved = statuses.filter { $0.status == .unresolved }.count
-                    let name = guest?.displayName ?? "Empty"
                     let angle = Double(seatNumber - 1) * 2 * Double.pi / Double(table.seatCount) - Double.pi / 2
-                    Button {
+                    DiagramSeat(table: table, number: seatNumber, variant: variant, event: event) {
                         seatTapped(table: table, seatNumber: seatNumber, variant: variant)
-                    } label: {
-                        VStack(spacing: 2) {
-                            Text("\(seatNumber) · \(name)")
-                                .font(.caption)
-                                .lineLimit(2)
-                                .minimumScaleFactor(0.8)
-                            if selected { Text("Selected").font(.caption2) }
-                            if statuses.contains(where: { $0.status == .satisfied }) {
-                                Text("✓ pair met").font(.caption2)
-                            }
-                            if conflicts > 0 { Text("! \(conflicts) conflict").font(.caption2) }
-                            if unresolved > 0 { Text("? \(unresolved) unresolved").font(.caption2) }
-                        }
-                        .frame(width: 130)
-                        .frame(minHeight: 64)
-                        .padding(3)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(selected ? Color.accentColor : Color.secondary, lineWidth: selected ? 3 : 1))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("diagram-seat-\(table.id.uuidString)-\(seatNumber)")
-                    .accessibilityLabel("\(table.label), seat \(seatNumber), \(name)\(selected ? ", selected" : ""), \(statuses.filter { $0.status == .satisfied }.count) pair preferences met, \(conflicts) conflicts, \(unresolved) unresolved")
-                    .accessibilityHint("Tap to select or assign. Seat \(table.seatCount) is adjacent to seat 1.")
                     .position(x: side / 2 + radius * cos(angle), y: side / 2 + radius * sin(angle))
                 }
             }
@@ -587,6 +554,53 @@ struct PairPreferencesContent: View {
             let second = event.guest(key.higher)?.displayName ?? "Guest"
             return "\(first) and \(second) have contradictory preferences; both remain listed."
         }
+    }
+}
+
+/// Diagram cell shares the existing seat command handler; no second rules model.
+private struct DiagramSeat: View {
+    @Environment(AppModel.self) private var model
+    let table: SeatingTable
+    let number: Int
+    let variant: PlanVariant
+    let event: SeatingEvent
+    let onTap: () -> Void
+
+    private var guestID: UUID? { variant.occupant(tableID: table.id, seatNumber: number) }
+    private var name: String { guestID.flatMap { event.guest($0)?.displayName } ?? "Empty" }
+    private var selected: Bool { guestID != nil && guestID == model.selectedGuestID }
+    private var statuses: [RuleEvaluation] {
+        RuleEngine.evaluate(event: event, variant: variant).filter { evaluation in
+            guestID.map { evaluation.guestIDs.contains($0) } ?? false
+        }
+    }
+    private var conflicts: Int { statuses.filter { $0.status == .conflict }.count }
+    private var unresolved: Int { statuses.filter { $0.status == .unresolved }.count }
+    private var satisfied: Int { statuses.filter { $0.status == .satisfied }.count }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 2) {
+                Text("\(number) · \(name)")
+                    .font(.caption)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                if selected { Text("Selected").font(.caption2) }
+                if satisfied > 0 { Text("✓ \(satisfied) pair met").font(.caption2) }
+                if conflicts > 0 { Text("! \(conflicts) conflict").font(.caption2) }
+                if unresolved > 0 { Text("? \(unresolved) unresolved").font(.caption2) }
+            }
+            .frame(width: 130)
+            .frame(minHeight: 64)
+            .padding(3)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(selected ? Color.accentColor : Color.secondary, lineWidth: selected ? 3 : 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("diagram-seat-\(table.id.uuidString)-\(number)")
+        .accessibilityLabel("\(table.label), seat \(number), \(name)\(selected ? ", selected" : ""), \(satisfied) pair preferences met, \(conflicts) conflicts, \(unresolved) unresolved")
+        .accessibilityHint("Tap to select or assign. Seat \(table.seatCount) is adjacent to seat 1.")
     }
 }
 
