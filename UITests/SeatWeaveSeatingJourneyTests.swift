@@ -180,6 +180,50 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         XCTAssertTrue(waitLabel(relaunched.buttons["seat-Round1-2"], containing: "Basil"))
     }
 
+    @MainActor
+    func testCircularDiagramUsesSameSeatCommandsAndListRemainsAvailable() throws {
+        let app = launchApp(fresh: true)
+        let title = app.textFields["event-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        title.typeText("Synthetic circle\n")
+        app.buttons["create-event-button"].tap()
+        XCTAssertTrue(app.navigationBars["Synthetic circle"].waitForExistence(timeout: 10))
+        addGuest(app, name: "Aster")
+        selectTab(app, "Tables")
+        app.buttons["add-table-button"].tap()
+        let field = app.textFields["table-label-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Round1\n")
+        app.buttons["confirm-add-table"].tap()
+        XCTAssertTrue(app.buttons["seat-Round1-1"].waitForExistence(timeout: 8))
+        let picker = app.segmentedControls["table-view-picker"]
+        for _ in 0..<8 where !picker.isHittable { app.swipeUp() }
+        XCTAssertTrue(picker.isHittable)
+        picker.buttons["Circular diagram"].tap()
+        let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "diagram-seat-")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        XCTAssertTrue(first.label.contains("seat 1"))
+        XCTAssertTrue(first.label.contains("Empty"))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "not a scaled floor plan")).firstMatch.exists)
+        picker.buttons["Seat list"].tap()
+        XCTAssertTrue(app.buttons["seat-Round1-1"].waitForExistence(timeout: 10))
+        app.buttons["seat-Round1-1"].tap() // empty seat without selected guest does not assign
+        XCTAssertTrue(app.buttons["seat-Round1-1"].label.contains("Unseated"))
+        selectTab(app, "Guests")
+        rosterButton(app, "Aster").firstMatch.tap()
+        selectTab(app, "Tables")
+        for _ in 0..<8 where !picker.isHittable { app.swipeUp() }
+        picker.buttons["Circular diagram"].tap()
+        first.tap()
+        XCTAssertTrue(waitIdentifiedLabel(app, identifier: "seating.summary", containing: "1 seated"))
+        picker.buttons["Seat list"].tap()
+        XCTAssertTrue(waitLabel(app.buttons["seat-Round1-1"], containing: "Aster"))
+        app.buttons["undo-button"].tap()
+        XCTAssertTrue(waitLabel(app.buttons["seat-Round1-1"], containing: "Unseated"))
+    }
+
     private func addGuest(_ app: XCUIApplication, name: String) {
         let field = app.textFields["add-guest-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
