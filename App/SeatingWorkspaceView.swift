@@ -310,8 +310,19 @@ struct TablesTab: View {
                 }
                 ForEach(variant.tables) { table in
                     Section {
-                        ForEach(1...table.seatCount, id: \.self) { seatNumber in
-                            seatRow(table: table, seatNumber: seatNumber, variant: variant, event: event)
+                        if model.showTableDiagram {
+                            ScrollView(.horizontal) {
+                                circularTable(table: table, variant: variant, event: event)
+                                    .frame(width: max(460, CGFloat(table.seatCount) * 78),
+                                           height: max(460, CGFloat(table.seatCount) * 78))
+                            }
+                            Text("Circular seating diagram, not a scaled floor plan. Switch to Seat list for non-spatial controls.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(1...table.seatCount, id: \.self) { seatNumber in
+                                seatRow(table: table, seatNumber: seatNumber, variant: variant, event: event)
+                            }
                         }
                         Button("Resize \(table.label)") {
                             pendingResizeTableID = table.id
@@ -329,6 +340,15 @@ struct TablesTab: View {
                     }
                 }
                 Section {
+                    Picker("Table view", selection: Binding(
+                        get: { model.showTableDiagram },
+                        set: { model.showTableDiagram = $0 }
+                    )) {
+                        Text("Seat list").tag(false)
+                        Text("Circular diagram").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("table-view-picker")
                     Button("Add table") { showAddTable = true }
                         .accessibilityIdentifier("add-table-button")
                 }
@@ -350,6 +370,66 @@ struct TablesTab: View {
     private struct ResizeBox: Identifiable {
         let tableID: UUID
         var id: UUID { tableID }
+    }
+
+    /// Numbered clockwise seats; first and last meet at the top of the same circle.
+    /// This is only another surface for seatTapped, not another command path.
+    private func circularTable(table: SeatingTable, variant: PlanVariant, event: SeatingEvent) -> some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            let radius = side / 2 - 80
+            let evaluations = RuleEngine.evaluate(event: event, variant: variant)
+            ZStack {
+                Circle()
+                    .strokeBorder(.secondary, lineWidth: 2)
+                    .frame(width: radius * 2, height: radius * 2)
+                Text(table.label)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .frame(width: side / 3)
+                    .accessibilityHidden(true)
+                ForEach(1...table.seatCount, id: \.self) { seatNumber in
+                    let guestID = variant.occupant(tableID: table.id, seatNumber: seatNumber)
+                    let guest = guestID.flatMap { event.guest($0) }
+                    let selected = guestID != nil && model.selectedGuestID == guestID
+                    let statuses = evaluations.filter { evaluation in
+                        guestID.map { evaluation.guestIDs.contains($0) } ?? false
+                    }
+                    let conflicts = statuses.filter { $0.status == .conflict }.count
+                    let unresolved = statuses.filter { $0.status == .unresolved }.count
+                    let name = guest?.displayName ?? "Empty"
+                    let angle = Double(seatNumber - 1) * 2 * Double.pi / Double(table.seatCount) - Double.pi / 2
+                    Button {
+                        seatTapped(table: table, seatNumber: seatNumber, variant: variant)
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text("\(seatNumber) · \(name)")
+                                .font(.caption)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.8)
+                            if selected { Text("Selected").font(.caption2) }
+                            if statuses.contains(where: { $0.status == .satisfied }) {
+                                Text("✓ pair met").font(.caption2)
+                            }
+                            if conflicts > 0 { Text("! \(conflicts) conflict").font(.caption2) }
+                            if unresolved > 0 { Text("? \(unresolved) unresolved").font(.caption2) }
+                        }
+                        .frame(width: 130)
+                        .frame(minHeight: 64)
+                        .padding(3)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(selected ? Color.accentColor : Color.secondary, lineWidth: selected ? 3 : 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("diagram-seat-\(table.id.uuidString)-\(seatNumber)")
+                    .accessibilityLabel("\(table.label), seat \(seatNumber), \(name)\(selected ? ", selected" : ""), \(statuses.filter { $0.status == .satisfied }.count) pair preferences met, \(conflicts) conflicts, \(unresolved) unresolved")
+                    .accessibilityHint("Tap to select or assign. Seat \(table.seatCount) is adjacent to seat 1.")
+                    .position(x: side / 2 + radius * cos(angle), y: side / 2 + radius * sin(angle))
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
     }
 
     @ViewBuilder

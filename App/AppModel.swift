@@ -52,6 +52,8 @@ final class AppModel {
     /// orientation changes and region switches must not reset it, and
     /// resizing never mutates assignments or focus.
     var focusedTableID: UUID?
+    /// View choice stays in app state across tabs and width changes; seat list is the default.
+    var showTableDiagram = false
     /// Acknowledgements are host-only and session-local. Relaunch forces a
     /// fresh review; edits prune keys immediately at the save boundary.
     private(set) var reviewAcknowledgements: Set<ConflictAcknowledgement> = []
