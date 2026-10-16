@@ -40,6 +40,7 @@ public struct SeatingCommands {
 
     @discardableResult
     public mutating func addGuest(displayName: String, id: UUID = UUID()) throws -> GuestIdentity {
+        try requireUnlockedSharedData()
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw CommandError("Guest name cannot be empty.") }
         guard event.guests.count < SeatingLimits.maximumGuestsPerEvent else {
@@ -57,6 +58,7 @@ public struct SeatingCommands {
     /// empty result and is undoable like every other command.
     @discardableResult
     public mutating func renameGuest(id guestID: UUID, newName: String) throws -> SeatingEvent {
+        try requireUnlockedSharedData()
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw CommandError("Guest name cannot be empty.") }
         guard let index = event.guests.firstIndex(where: { $0.id == guestID }) else {
@@ -78,21 +80,30 @@ public struct SeatingCommands {
             guard let seat = variant.seat(for: guestID) else { return nil }
             return VariantAssignmentLoss(variantID: variant.id, variantName: variant.name, assignment: seat)
         }
+        let affectedFinalPlanNames = event.variants.filter { $0.isFinal && $0.seat(for: guestID) != nil }.map(\.name)
         return GuestDeletionPreview(
             guestID: guestID,
             removedPreferences: removedPreferences,
-            removedAssignments: removedAssignments
+            removedAssignments: removedAssignments,
+            affectedFinalPlanNames: affectedFinalPlanNames
         )
     }
 
     /// Guest deletion requires an explicit preview the caller has seen; a
-    /// mismatched preview is rejected without mutation.
+    /// mismatched preview is rejected without mutation. If a final plan
+    /// seats this guest, deleting requires unlocking that plan first so
+    /// a lock cannot silently imply unchanged readiness.
     @discardableResult
     public mutating func deleteGuest(guestID: UUID, confirmedPreview: GuestDeletionPreview) throws -> SeatingEvent {
+        try requireUnlockedSharedData()
         guard event.guest(guestID) != nil else { throw CommandError("Unknown guest.") }
         let fresh = try guestDeletionPreview(guestID: guestID)
         guard fresh == confirmedPreview else {
             throw CommandError("The deletion plan changed after preview; nothing was deleted.")
+        }
+        if !fresh.affectedFinalPlanNames.isEmpty {
+            let names = fresh.affectedFinalPlanNames.joined(separator: ", ")
+            throw CommandError("Cannot delete guest seated in final plan (\(names)). Unlock the plan first.")
         }
         commit { model in
             model.guests.removeAll { $0.id == guestID }
@@ -108,6 +119,7 @@ public struct SeatingCommands {
 
     @discardableResult
     public mutating func addPreference(firstGuestID: UUID, secondGuestID: UUID, kind: PairPreferenceKind, id: UUID = UUID()) throws -> PairPreference {
+        try requireUnlockedSharedData()
         guard event.guest(firstGuestID) != nil, event.guest(secondGuestID) != nil else {
             throw CommandError("Preferences reference guests in this event only.")
         }
@@ -124,6 +136,7 @@ public struct SeatingCommands {
 
     @discardableResult
     public mutating func removePreference(id: UUID) throws -> SeatingEvent {
+        try requireUnlockedSharedData()
         guard event.preferences.contains(where: { $0.id == id }) else {
             throw CommandError("Unknown preference.")
         }
@@ -132,6 +145,23 @@ public struct SeatingCommands {
     }
 
     // MARK: - Variant structure
+
+    /// Marking final locks the arrangement; only this command and an
+    /// explicit unlock (or editing a duplicate) change that state.
+    @discardableResult
+    public mutating func setFinal(variantID: UUID, isFinal: Bool) throws -> SeatingEvent {
+        guard let index = event.variants.firstIndex(where: { $0.id == variantID }) else {
+            throw CommandError("Unknown variant.")
+        }
+        guard event.variants[index].isFinal != isFinal else { return event }
+        if isFinal, !event.variants[index].occupancyIsCoherent {
+            throw CommandError("Unknown or inconsistent variant.")
+        }
+        commit { model in
+            model.variants[index].isFinal = isFinal
+        }
+        return event
+    }
 
     @discardableResult
     public mutating func addTable(toVariant variantID: UUID, label: String, seatCount: Int) throws -> SeatingTable {
@@ -168,7 +198,8 @@ public struct SeatingCommands {
     public mutating func renameVariant(id variantID: UUID, newName: String) throws -> SeatingEvent {
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw CommandError("Variant name cannot be empty.") }
-        guard event.variant(variantID) != nil else { throw CommandError("Unknown variant.") }
+        guard let variant = event.variant(variantID) else { throw CommandError("Unknown variant.") }
+        guard !variant.isFinal else { throw CommandError("Final plan is locked. Unlock or duplicate it before editing.") }
         commit { model in
             let index = model.variants.firstIndex(where: { $0.id == variantID })!
             model.variants[index].name = name
@@ -272,9 +303,20 @@ public struct SeatingCommands {
     // MARK: - Session undo
 
     public mutating func undo() throws {
-        guard let previous = undoStack.popLast() else {
+        guard let previous = undoStack.last else {
             throw CommandError("Nothing left to undo in this session.")
         }
+        // Undo never removes a final designation implicitly; use the
+        // explicit unlock command instead. Shared-data edits and seat edits
+        // against a locked plan were already refused at the command boundary.
+        let lockedNow = Set(event.variants.filter(\.isFinal).map(\.id))
+        let lockedThen = Set(previous.variants.filter(\.isFinal).map(\.id))
+        guard lockedNow.isSubset(of: lockedThen),
+              (!lockedNow.isEmpty ? event.guests == previous.guests && event.preferences == previous.preferences : true),
+              lockedNow.allSatisfy({ event.variant($0) == previous.variant($0) }) else {
+            throw CommandError("Unlock the final plan before undoing this change.")
+        }
+        undoStack.removeLast()
         event = previous
     }
 
@@ -290,6 +332,19 @@ public struct SeatingCommands {
         public let guestID: UUID
         public let removedPreferences: [PairPreference]
         public let removedAssignments: [VariantAssignmentLoss]
+        public let affectedFinalPlanNames: [String]
+
+        public init(
+            guestID: UUID,
+            removedPreferences: [PairPreference],
+            removedAssignments: [VariantAssignmentLoss],
+            affectedFinalPlanNames: [String] = []
+        ) {
+            self.guestID = guestID
+            self.removedPreferences = removedPreferences
+            self.removedAssignments = removedAssignments
+            self.affectedFinalPlanNames = affectedFinalPlanNames
+        }
     }
 
     private func requireVariant(_ id: UUID) throws -> PlanVariant {
@@ -297,10 +352,20 @@ public struct SeatingCommands {
         return variant
     }
 
+    /// Shared roster/preference edits change what a final plan means even
+    /// though they never touch its seats, so they are refused explicitly
+    /// rather than silently leaving a "final" plan describing something else.
+    private func requireUnlockedSharedData() throws {
+        guard !event.variants.contains(where: \.isFinal) else {
+            throw CommandError("A plan is marked final. Unlock it before changing shared guests or preferences.")
+        }
+    }
+
     /// Copy-on-write mutation: validation happens against a copy, so any
     /// thrown error leaves `event` untouched and never reports success.
     private mutating func mutateVariant(_ id: UUID, _ mutation: (inout PlanVariant) throws -> Void) throws {
         guard var variant = event.variant(id) else { throw CommandError("Unknown variant.") }
+        guard !variant.isFinal else { throw CommandError("Final plan is locked. Unlock or duplicate it before editing.") }
         try mutation(&variant)
         guard variant.occupancyIsCoherent else {
             throw CommandError("The change would break seating occupancy; nothing was applied.")
