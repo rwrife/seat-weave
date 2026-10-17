@@ -123,6 +123,22 @@ xcodebuild test \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-test-compact.log"
 
+# Issue #20: generate synthetic multipage PDFs with the same app renderer,
+# extract the simulator sandbox, verify PDF text/page geometry and save PNGs
+# of the first and last page of each layout/paper combination for review.
+phase="pdf_fixtures"
+xcrun simctl terminate "$simulator_udid" com.infinityball.seatweave || true
+xcrun simctl launch "$simulator_udid" com.infinityball.seatweave -ui-testing -resetStore YES -export-fixtures
+container_path="$(xcrun simctl get_app_container "$simulator_udid" com.infinityball.seatweave data)"
+for attempt in 1 2 3 4 5; do
+  [[ -f "$container_path/Documents/export-fixtures/alphabeticalLookup-a4.pdf" ]] && break
+  sleep 1
+done
+mkdir -p "$artifact_dir/pdf-fixtures"
+cp "$container_path"/Documents/export-fixtures/*.pdf "$artifact_dir/pdf-fixtures/"
+xcrun swift Scripts/check_pdf.swift "$artifact_dir/pdf-fixtures" \
+  2>&1 | tee "$artifact_dir/pdf-fixtures-check.log"
+
 # Issue #6 large-text journey: a separate invocation with the
 # destination's content size raised to the accessibility range through
 # `simctl ui` (the scripted equivalent of Settings > Accessibility >

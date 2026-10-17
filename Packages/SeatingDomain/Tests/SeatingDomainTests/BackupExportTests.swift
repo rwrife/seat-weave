@@ -32,6 +32,111 @@ struct BackupExportTests {
                             variants: [variant])
     }
 
+    // MARK: - Alphabetical lookup export
+
+    @Test("Alphabetical lookup sorts locale-aware and retains distinct identical names")
+    func alphabeticalLookupOrdering() throws {
+        let alice1 = GuestIdentity(displayName: "Alice")
+        let alice2 = GuestIdentity(displayName: "Alice")
+        let zoe = GuestIdentity(displayName: "Zoë")
+        let bob = GuestIdentity(displayName: "Bob")
+        let round1 = SeatingTable(label: "Table 1", seatCount: 4)
+        let round2 = SeatingTable(label: "Table 2", seatCount: 4)
+        let variant = PlanVariant(
+            name: "Plan A",
+            tables: [round1, round2],
+            assignments: [
+                SeatAssignment(guestID: zoe.id, tableID: round2.id, seatNumber: 1),
+                SeatAssignment(guestID: alice1.id, tableID: round1.id, seatNumber: 2),
+                SeatAssignment(guestID: bob.id, tableID: round1.id, seatNumber: 1),
+                SeatAssignment(guestID: alice2.id, tableID: round2.id, seatNumber: 3),
+            ]
+        )
+        let event = SeatingEvent(
+            title: "Alphabetical dinner",
+            guests: [zoe, alice1, bob, alice2],
+            preferences: [],
+            variants: [variant]
+        )
+
+        let preview = try PublicExportBuilder.preview(
+            event: event,
+            variantID: variant.id,
+            layout: .alphabeticalLookup
+        )
+
+        let rows = preview.export.rows
+        #expect(rows.count == 4)
+        #expect(rows[0].displayName == "Alice" && rows[0].tableLabel == "Table 1" && rows[0].seatNumber == 2)
+        #expect(rows[1].displayName == "Alice" && rows[1].tableLabel == "Table 2" && rows[1].seatNumber == 3)
+        #expect(rows[2].displayName == "Bob" && rows[2].tableLabel == "Table 1" && rows[2].seatNumber == 1)
+        #expect(rows[3].displayName == "Zoë" && rows[3].tableLabel == "Table 2" && rows[3].seatNumber == 1)
+
+        let lines = preview.text.split(separator: "\n").map(String.init)
+        #expect(lines[0] == "Alphabetical dinner — Plan A")
+        #expect(lines[1] == "Alice — Table 1, Seat 2")
+        #expect(lines[2] == "Alice — Table 2, Seat 3")
+        #expect(lines[3] == "Bob — Table 1, Seat 1")
+        #expect(lines[4] == "Zoë — Table 2, Seat 1")
+    }
+
+    @Test("Paper size choices adjust printable bounds")
+    func paperSizeBounds() {
+        #expect(PublicExportPaperSize.letter.dimensionsInPoints.width == 612)
+        #expect(PublicExportPaperSize.letter.dimensionsInPoints.height == 792)
+        #expect(PublicExportPaperSize.a4.dimensionsInPoints.width == 595.275590551181)
+        #expect(PublicExportPaperSize.a4.dimensionsInPoints.height == 841.8897637795276)
+    }
+
+    @Test("Pagination handles max supported guests and tables cleanly")
+    func paginationForMaxLimits() throws {
+        // 40 guests seated across 6 tables (maximum bounds in SeatingLimits)
+        var tables: [SeatingTable] = []
+        for i in 1...6 {
+            tables.append(SeatingTable(label: "Table \(i)", seatCount: 7))
+        }
+        var guests: [GuestIdentity] = []
+        var assignments: [SeatAssignment] = []
+        for i in 1...40 {
+            let guest = GuestIdentity(displayName: "Guest With A Realistic Longish Name Number \(i) — Special Unicode Üñîçødé")
+            guests.append(guest)
+            let tableIndex = (i - 1) % 6
+            let seatNumber = ((i - 1) / 6) + 1
+            assignments.append(SeatAssignment(guestID: guest.id, tableID: tables[tableIndex].id, seatNumber: seatNumber))
+        }
+        let variant = PlanVariant(name: "Full Reception", tables: tables, assignments: assignments)
+        let event = SeatingEvent(title: "Grand Gala", guests: guests, preferences: [], variants: [variant])
+
+        let tablePreview = try PublicExportBuilder.preview(
+            event: event,
+            variantID: variant.id,
+            layout: .tableOrder,
+            paperSize: .a4
+        )
+        let alphaPreview = try PublicExportBuilder.preview(
+            event: event,
+            variantID: variant.id,
+            layout: .alphabeticalLookup,
+            paperSize: .letter
+        )
+
+        let tablePages = PublicPDFLayout.pages(for: tablePreview.export)
+        let alphaPages = PublicPDFLayout.pages(for: alphaPreview.export)
+
+        // 40 rows / 24 per page -> exactly 2 pages
+        #expect(tablePages.count == 2)
+        #expect(tablePages[0].count == 24)
+        #expect(tablePages[1].count == 16)
+
+        #expect(alphaPages.count == 2)
+        #expect(alphaPages[0].count == 24)
+        #expect(alphaPages[1].count == 16)
+
+        // Headers verify
+        #expect(PublicPDFLayout.header(tablePreview.export, page: 1, pageCount: 2).contains("Table order"))
+        #expect(PublicPDFLayout.header(alphaPreview.export, page: 2, pageCount: 2).contains("Alphabetical lookup"))
+    }
+
     // MARK: - Public export privacy
 
     @Test("Public export carries only title, plan name, labels and seated names")
@@ -274,7 +379,7 @@ struct BackupExportTests {
         #expect(pages[0].count == PublicPDFLayout.rowsPerPage)
         #expect(pages.flatMap { $0 } == rows)
         #expect(PublicPDFLayout.header(export, page: 2, pageCount: 3)
-                == "Big dinner — Plan Z · page 2 of 3")
+                == "Big dinner — Plan Z · Table order · page 2 of 3")
         // Empty plan still yields one page so the renderer prints the
         // "no guests" notice instead of an empty document.
         let empty = PublicSeatingExport(eventTitle: "E", planName: "P", rows: [])
