@@ -106,17 +106,33 @@ public struct PlanVariant: Codable, Hashable, Sendable, Identifiable {
     public var name: String
     public var tables: [SeatingTable]
     public var assignments: [SeatAssignment]
+    /// Host-only designation. Shared roster/preference edits require an
+    /// explicit unlock; public seating exports never include this flag.
+    public var isFinal: Bool
+
+    private enum CodingKeys: String, CodingKey { case id, name, tables, assignments, isFinal }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        tables = try values.decode([SeatingTable].self, forKey: .tables)
+        assignments = try values.decode([SeatAssignment].self, forKey: .assignments)
+        isFinal = try values.decodeIfPresent(Bool.self, forKey: .isFinal) ?? false
+    }
 
     public init(
         id: UUID = UUID(),
         name: String,
         tables: [SeatingTable] = [],
-        assignments: [SeatAssignment] = []
+        assignments: [SeatAssignment] = [],
+        isFinal: Bool = false
     ) {
         self.id = id
         self.name = name
         self.tables = tables
         self.assignments = assignments
+        self.isFinal = isFinal
     }
 
     public func table(_ id: UUID) -> SeatingTable? {

@@ -609,13 +609,41 @@ struct PlansTab: View {
     @Environment(AppModel.self) private var model
     @State private var renameTarget: UUID?
     @State private var renameText = ""
+    @State private var comparisonTarget: UUID?
+    @State private var lockTarget: UUID?
+    @State private var unlockTarget: UUID?
 
     var body: some View {
         List {
-
-            Section("Compare plans") {
+            Section("Plans") {
                 ForEach(model.allVariantSummaries(), id: \.variantID) { summary in
                     variantRow(summary)
+                }
+            }
+            if let event = model.event, let selected = model.selectedVariant {
+                Section("Final plan") {
+                    if selected.isFinal {
+                        Text("Final · Locked. Seats, tables, and shared guests and preferences cannot change until unlocked. You can duplicate this plan to try another arrangement.")
+                            .accessibilityIdentifier("final-plan-status")
+                        Button("Unlock \(selected.name)") { unlockTarget = selected.id }
+                            .accessibilityIdentifier("unlock-final-plan")
+                    } else {
+                        Text("Marking final locks this plan and shared guest/preference edits. A copy stays editable; unlock to change shared information.")
+                            .font(.caption)
+                        Button("Mark \(selected.name) final and lock") { lockTarget = selected.id }
+                            .accessibilityIdentifier("lock-final-plan")
+                    }
+                }
+                if event.variants.count > 1 {
+                    Section("Compare selected plan with") {
+                        ForEach(event.variants.filter { $0.id != selected.id }, id: \.id) { other in
+                            Button("Compare with \(other.name)") { comparisonTarget = other.id }
+                                .accessibilityIdentifier("compare-plan-\(other.id.uuidString)")
+                        }
+                    }
+                    if let targetID = comparisonTarget, let target = event.variant(targetID), target.id != selected.id {
+                        comparisonRows(PlanComparison.make(event: event, from: selected, to: target), event: event)
+                    }
                 }
             }
             if renameTarget != nil {
@@ -628,7 +656,63 @@ struct PlansTab: View {
                 }
             }
         }
+        .confirmationDialog("Mark plan final and lock?", isPresented: Binding(
+            get: { lockTarget != nil }, set: { if !$0 { lockTarget = nil } }
+        )) {
+            Button("Mark final and lock") {
+                if let id = lockTarget { changeFinal(id, to: true) }
+                lockTarget = nil
+            }
+            Button("Cancel", role: .cancel) { lockTarget = nil }
+        } message: {
+            Text("This locks the selected arrangement and shared guest/preference changes until you unlock it.")
+        }
+        .confirmationDialog("Unlock final plan?", isPresented: Binding(
+            get: { unlockTarget != nil }, set: { if !$0 { unlockTarget = nil } }
+        )) {
+            Button("Unlock plan") {
+                if let id = unlockTarget { changeFinal(id, to: false) }
+                unlockTarget = nil
+            }
+            Button("Cancel", role: .cancel) { unlockTarget = nil }
+        } message: {
+            Text("Unlocking removes the final designation; changes to this plan and shared guests/preferences are allowed again.")
+        }
         .modifier(FailureAlertModifier())
+    }
+
+    private func changeFinal(_ id: UUID, to value: Bool) {
+        model.perform { controller in
+            try controller.perform { commands in
+                _ = try commands.setFinal(variantID: id, isFinal: value)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func comparisonRows(_ comparison: PlanComparison, event: SeatingEvent) -> some View {
+        Section("Differences") {
+            if comparison.guests.isEmpty && comparison.preferences.isEmpty && comparison.tables.isEmpty {
+                Text("No seating or preference differences.")
+            }
+            if comparison.tablesAreIndependentlyIdentified {
+                Text("Tables have separate identities in these plans. Equal table labels and seat numbers do not mean the same table; verify positions before choosing a final plan.")
+                    .font(.caption)
+            }
+            ForEach(comparison.tables, id: \.table.id) { change in
+                Text("\(change.onlyInTarget ? "Added" : "Removed") table: \(change.table.label) (\(change.table.seatCount) seats)")
+            }
+            ForEach(comparison.guests, id: \.guest.id) { change in
+                let before = change.before.map { "\(change.beforeTableLabel ?? "Unknown table"), seat \($0.seatNumber)" } ?? "unseated"
+                let after = change.after.map { "\(change.afterTableLabel ?? "Unknown table"), seat \($0.seatNumber)" } ?? "unseated"
+                Text("\(change.guest.displayName): \(before) → \(after)\(change.samePrintedPosition ? " (same printed position, different table identity)" : "")")
+            }
+            ForEach(comparison.preferences, id: \.preference.id) { change in
+                let first = event.guest(change.preference.firstGuestID)?.displayName ?? "Guest"
+                let second = event.guest(change.preference.secondGuestID)?.displayName ?? "Guest"
+                Text("\(first) + \(second), \(change.preference.kind.rawValue): \(change.before.rawValue) → \(change.after.rawValue)")
+            }
+        }
     }
 
     @ViewBuilder
@@ -641,6 +725,10 @@ struct PlansTab: View {
                 HStack {
                     Text(summary.name)
                         .font(.headline)
+                    if model.event?.variant(summary.variantID)?.isFinal == true {
+                        Text("Final · Locked")
+                            .font(.caption)
+                    }
                     Spacer()
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
@@ -656,9 +744,11 @@ struct PlansTab: View {
         .accessibilityIdentifier("plan-\(summary.name)")
         .contextMenu {
             Button("Duplicate") { duplicate(summary) }
-            Button("Rename") {
-                renameTarget = summary.variantID
-                renameText = summary.name
+            if model.event?.variant(summary.variantID)?.isFinal != true {
+                Button("Rename") {
+                    renameTarget = summary.variantID
+                    renameText = summary.name
+                }
             }
         }
     }

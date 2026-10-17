@@ -194,7 +194,8 @@ public enum SeatingBackup {
             }
             return PlanVariant(id: variantMap[variant.id]!, name: variant.name,
                                tables: variant.tables.map { SeatingTable(id: tableMap[$0.id]!, label: $0.label, seatCount: $0.seatCount) },
-                               assignments: assignments)
+                               assignments: assignments,
+                               isFinal: variant.isFinal)
         }
         return SeatingEvent(id: UUID(), title: event.title, guests: guests, preferences: preferences, variants: variants)
     }

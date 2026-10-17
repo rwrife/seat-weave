@@ -224,6 +224,41 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         XCTAssertTrue(waitLabel(app.buttons["seat-Round1-1"], containing: "Unseated"))
     }
 
+    @MainActor
+    func testFinalLockPersistsAndExplicitUnlockAllowsEdits() throws {
+        let app = launchApp(fresh: true)
+        let title = app.textFields["event-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        title.typeText("Synthetic final\n")
+        app.buttons["create-event-button"].tap()
+        XCTAssertTrue(app.navigationBars["Synthetic final"].waitForExistence(timeout: 10))
+        selectTab(app, "Plans")
+        let lock = app.buttons["lock-final-plan"]
+        XCTAssertTrue(lock.waitForExistence(timeout: 10))
+        lock.tap()
+        XCTAssertTrue(app.buttons["Mark final and lock"].waitForExistence(timeout: 5))
+        app.buttons["Mark final and lock"].tap()
+        XCTAssertTrue(waitIdentifiedLabel(app, identifier: "final-plan-status", containing: "Locked"))
+        app.terminate()
+        let resumed = launchApp(fresh: false)
+        XCTAssertTrue(resumed.navigationBars["Synthetic final"].waitForExistence(timeout: 10))
+        selectTab(resumed, "Plans")
+        XCTAssertTrue(waitIdentifiedLabel(resumed, identifier: "final-plan-status", containing: "Locked"))
+        resumed.buttons["unlock-final-plan"].tap()
+        XCTAssertTrue(resumed.buttons["Unlock plan"].waitForExistence(timeout: 5))
+        resumed.buttons["Unlock plan"].tap()
+        XCTAssertTrue(resumed.buttons["lock-final-plan"].waitForExistence(timeout: 10))
+        selectTab(resumed, "Tables")
+        resumed.buttons["add-table-button"].tap()
+        let field = resumed.textFields["table-label-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Round2\n")
+        resumed.buttons["confirm-add-table"].tap()
+        XCTAssertTrue(resumed.buttons["seat-Round2-1"].waitForExistence(timeout: 10))
+    }
+
     private func addGuest(_ app: XCUIApplication, name: String) {
         let field = app.textFields["add-guest-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
