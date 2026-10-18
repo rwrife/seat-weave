@@ -96,6 +96,21 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
                       "backup warning must name the private data it carries")
         app.buttons["Cancel"].tap()
 
+        // Automatic points are browsable with timestamps and private-count
+        // summaries. Restoring is exercised at the store layer; here the
+        // journey proves preview + discard never mutates the event list.
+        let recoveryBrowse = app.buttons["recovery-browse-button"]
+        XCTAssertTrue(recoveryBrowse.waitForExistence(timeout: 5))
+        recoveryBrowse.tap()
+        XCTAssertTrue(app.navigationBars["Recovery points"].waitForExistence(timeout: 5))
+        let previews = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "recovery-preview-"))
+        XCTAssertTrue(previews.firstMatch.waitForExistence(timeout: 5))
+        previews.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["recovery-preview-summary"].waitForExistence(timeout: 5))
+        app.buttons["recovery-preview-discard"].tap()
+        app.buttons["close-recovery-sheet"].tap()
+        XCTAssertTrue(app.navigationBars["Synthetic share"].waitForExistence(timeout: 5))
+
         // Deleting the open event pops back to the event list.
         app.buttons["delete-event-button"].tap()
         let deleteAction = app.buttons["Delete event"]
@@ -104,6 +119,26 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.textFields["event-title-field"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.buttons["open-event-Synthetic share"].exists,
                        "the deleted event must be gone from the list")
+        // Issue #16: ordinary deletion is recoverable for 14 days. Recover
+        // it, delete it again, then remove it permanently.
+        let recover = app.buttons["list-recover-Synthetic share"]
+        XCTAssertTrue(recover.waitForExistence(timeout: 8))
+        recover.tap()
+        XCTAssertTrue(app.buttons["open-event-Synthetic share"].waitForExistence(timeout: 8))
+        app.buttons["open-event-Synthetic share"].tap()
+        XCTAssertTrue(app.navigationBars["Synthetic share"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Share"].tap()
+        XCTAssertTrue(app.buttons["recovery-browse-button"].waitForExistence(timeout: 5))
+        app.buttons["delete-event-button"].tap()
+        XCTAssertTrue(app.buttons["Delete event"].waitForExistence(timeout: 5))
+        app.buttons["Delete event"].tap()
+        let permanent = app.buttons["list-permanent-Synthetic share"]
+        XCTAssertTrue(permanent.waitForExistence(timeout: 8))
+        permanent.tap()
+        let confirmPermanent = app.buttons["confirm-permanent-delete"].firstMatch
+        XCTAssertTrue(confirmPermanent.waitForExistence(timeout: 5))
+        confirmPermanent.tap()
+        XCTAssertFalse(recover.exists, "permanent deletion must remove the recovery copy")
 
         // Create a second synthetic event and reopen it to exercise
         // delete-all from the Share tab (delete-all lives in the workspace).
