@@ -111,7 +111,9 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         app.buttons["close-recovery-sheet"].tap()
         XCTAssertTrue(app.navigationBars["Synthetic share"].waitForExistence(timeout: 5))
 
-        // Deleting the open event pops back to the event list.
+        // Deleting the open event pops back to the event list. The new
+        // recovery section pushes Delete below the compact lazy List fold.
+        revealDeleteButton(app)
         app.buttons["delete-event-button"].tap()
         let deleteAction = app.buttons["Delete event"]
         XCTAssertTrue(deleteAction.waitForExistence(timeout: 5))
@@ -129,6 +131,7 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Synthetic share"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Share"].tap()
         XCTAssertTrue(app.buttons["recovery-browse-button"].waitForExistence(timeout: 5))
+        revealDeleteButton(app)
         app.buttons["delete-event-button"].tap()
         XCTAssertTrue(app.buttons["Delete event"].waitForExistence(timeout: 5))
         app.buttons["Delete event"].tap()
@@ -149,15 +152,7 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Synthetic two"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Share"].tap()
         let deleteAll = app.buttons["delete-all-button"]
-        // Review chrome adds a section above Delete. SwiftUI List lazily
-        // realizes the bottom destructive row only after scrolling the
-        // front workspace list (not the event list mounted behind it).
-        for _ in 0..<8 where !deleteAll.isHittable {
-            let lists = app.collectionViews
-            XCTAssertGreaterThan(lists.count, 0)
-            lists.element(boundBy: lists.count - 1).swipeUp()
-        }
-        XCTAssertTrue(deleteAll.waitForExistence(timeout: 5))
+        revealDeleteButton(app, identifier: "delete-all-button")
         XCTAssertTrue(deleteAll.isHittable, "Delete all must remain reachable after review chrome")
         XCTAssertTrue(deleteAll.isEnabled)
         deleteAll.tap()
@@ -169,6 +164,20 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.buttons["create-event-button"].exists)
         XCTAssertFalse(app.buttons["open-event-Synthetic share"].exists)
         XCTAssertFalse(app.buttons["open-event-Synthetic two"].exists)
+    }
+
+    /// The recovery + Recently Deleted sections push the destructive rows
+    /// below the compact lazy-List fold; scroll the front workspace list
+    /// (not the event list mounted behind it) until hittable.
+    private func revealDeleteButton(_ app: XCUIApplication,
+                                    identifier: String = "delete-event-button") {
+        let button = app.buttons[identifier]
+        for _ in 0..<8 where !button.isHittable {
+            let lists = app.collectionViews
+            XCTAssertGreaterThan(lists.count, 0)
+            lists.element(boundBy: lists.count - 1).swipeUp()
+        }
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "\(identifier) must be reachable")
     }
 
     @MainActor
