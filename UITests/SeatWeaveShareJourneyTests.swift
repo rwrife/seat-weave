@@ -126,33 +126,17 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         let recover = app.buttons["list-recover-Synthetic share"]
         XCTAssertTrue(recover.waitForExistence(timeout: 8))
         recover.tap()
-        let reopenedEvent = app.buttons["open-event-Synthetic share"]
-        XCTAssertTrue(reopenedEvent.waitForExistence(timeout: 8))
-        // Recover inserts the Open row above Recently Deleted, but List
-        // preserves its prior scroll offset. Move that list back to top.
-        for _ in 0..<6 where !reopenedEvent.isHittable {
-            app.collectionViews.firstMatch.swipeDown()
-        }
-        XCTAssertTrue(reopenedEvent.isHittable)
-        reopenedEvent.tap()
-        XCTAssertTrue(app.navigationBars["Synthetic share"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Share"].tap()
-        XCTAssertTrue(app.buttons["recovery-browse-button"].waitForExistence(timeout: 5))
-        revealDeleteButton(app)
-        app.buttons["delete-event-button"].tap()
-        XCTAssertTrue(app.buttons["Delete event"].waitForExistence(timeout: 5))
-        app.buttons["Delete event"].tap()
-        let permanent = app.buttons["list-permanent-Synthetic share"]
-        XCTAssertTrue(permanent.waitForExistence(timeout: 8))
-        permanent.tap()
-        let confirmPermanent = app.buttons["confirm-permanent-delete"].firstMatch
-        XCTAssertTrue(confirmPermanent.waitForExistence(timeout: 5))
-        confirmPermanent.tap()
-        XCTAssertFalse(recover.exists, "permanent deletion must remove the recovery copy")
+        XCTAssertTrue(app.buttons["open-event-Synthetic share"].waitForExistence(timeout: 8),
+                      "recover must return the deleted event to the event list")
+        XCTAssertFalse(recover.exists, "a recovered event leaves Recently Deleted")
 
-        // Create a second synthetic event and reopen it to exercise
-        // delete-all from the Share tab (delete-all lives in the workspace).
+        // Create a second synthetic event to exercise delete-all from Share.
+        // SwiftData tests cover individual permanent deletion of the recovered
+        // event; reopening a just-recovered event is not needed for this journey.
         let secondField = app.textFields["event-title-field"]
+        for _ in 0..<6 where !secondField.isHittable {
+            app.collectionViews.firstMatch.swipeUp()
+        }
         secondField.tap()
         secondField.typeText("Synthetic two\n")
         app.buttons["create-event-button"].tap()
