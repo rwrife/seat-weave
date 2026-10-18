@@ -432,6 +432,22 @@ struct RecoveryPointsSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                // Preview section FIRST: it must be visible without
+                // scrolling on compact phones (lazy List otherwise never
+                // realizes it below the points list).
+                if let pending = model.pendingRecovery {
+                    Section("Recovery preview") {
+                        Text("Restore '\(pending.summary.title)' from \(pending.createdAt.formatted(date: .abbreviated, time: .shortened)) — \(pending.summary.guestCount) guest(s), \(pending.summary.preferenceCount) private preference(s), \(pending.summary.variantCount) plan(s).")
+                            .accessibilityIdentifier("recovery-preview-summary")
+                        Text("It becomes a NEW event with fresh identities. The current event is never overwritten.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Restore as new event") { model.restoreRecoveryPoint() }
+                            .accessibilityIdentifier("recovery-restore-confirm")
+                        Button("Discard", role: .cancel) { model.pendingRecovery = nil }
+                            .accessibilityIdentifier("recovery-preview-discard")
+                    }
+                }
                 Section("Automatic recovery points") {
                     if model.recoveryPoints.isEmpty {
                         Text("No recovery points yet. They appear after the first saved edit.")
@@ -449,19 +465,6 @@ struct RecoveryPointsSheet: View {
                                 .accessibilityIdentifier("recovery-preview-\(point.id.uuidString)")
                             }
                         }
-                    }
-                }
-                if let pending = model.pendingRecovery {
-                    Section("Recovery preview") {
-                        Text("Restore '\(pending.summary.title)' from \(pending.createdAt.formatted(date: .abbreviated, time: .shortened)) — \(pending.summary.guestCount) guest(s), \(pending.summary.preferenceCount) private preference(s), \(pending.summary.variantCount) plan(s).")
-                            .accessibilityIdentifier("recovery-preview-summary")
-                        Text("It becomes a NEW event with fresh identities. The current event is never overwritten.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Button("Restore as new event") { model.restoreRecoveryPoint() }
-                            .accessibilityIdentifier("recovery-restore-confirm")
-                        Button("Discard", role: .cancel) { model.pendingRecovery = nil }
-                            .accessibilityIdentifier("recovery-preview-discard")
                     }
                 }
             }
