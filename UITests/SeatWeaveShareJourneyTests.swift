@@ -126,8 +126,15 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         let recover = app.buttons["list-recover-Synthetic share"]
         XCTAssertTrue(recover.waitForExistence(timeout: 8))
         recover.tap()
-        XCTAssertTrue(app.buttons["open-event-Synthetic share"].waitForExistence(timeout: 8))
-        app.buttons["open-event-Synthetic share"].tap()
+        let reopenedEvent = app.buttons["open-event-Synthetic share"]
+        XCTAssertTrue(reopenedEvent.waitForExistence(timeout: 8))
+        // Recover inserts the Open row above Recently Deleted, but List
+        // preserves its prior scroll offset. Move that list back to top.
+        for _ in 0..<6 where !reopenedEvent.isHittable {
+            app.collectionViews.firstMatch.swipeDown()
+        }
+        XCTAssertTrue(reopenedEvent.isHittable)
+        reopenedEvent.tap()
         XCTAssertTrue(app.navigationBars["Synthetic share"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Share"].tap()
         XCTAssertTrue(app.buttons["recovery-browse-button"].waitForExistence(timeout: 5))
