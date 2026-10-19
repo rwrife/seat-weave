@@ -20,4 +20,8 @@ Scope: Automatic local recovery snapshots, bounded retention, preview/restore, r
 - **Python tooling tests**: 31 unit tests passing (`python3 -m unittest discover -s Scripts/tests`).
 - **Static entitlement audit**: passed with zero violations (`python3 Scripts/entitlement_audit.py --source-only`).
 - **Syntax check**: Swift 6 parser verified on all modified domain, app, and UI test sources.
-- **Native Apple CI**: required for SwiftData store tests (`EventStoreTests`) and XCTest UI journeys (`SeatWeaveShareJourneyTests`).
+- **Native Apple CI (exact head)**: pinned run 39125704177, job 117670247531, commit `6c21bf50ba0587d2627d67441ae91a7e7f79d09c` succeeded on macOS ARM64 with `DEVELOPER_DIR=/Applications/Xcode_26.0.1.app/Contents/Developer`, `phase=complete`, `exit_status=0`, and `expected_sha == actual_sha` in the downloaded `provenance.txt`. The compact suite on iPhone destination plus regular-width destination ran all app/UI targets; the SwiftData-gated store and share deletion journeys passed on that exact head.
+
+## CI repairs
+
+- run 39113530748 failed at `open-event-Synthetic share` after `Recover` returned the event: the compact list retained a prior scroll offset, so the row was not hittable. Trimming unnecessary re-navigation in the share journey and scroll-then-tap helpers for the Share-tab destructive rows produced the successful exact-head run above.
