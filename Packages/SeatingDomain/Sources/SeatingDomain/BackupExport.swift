@@ -17,6 +17,8 @@ import Foundation
 ///   fresh IDs; it never merges into or overwrites a stored event.
 public enum SeatingBackup {
     public static let currentVersion = 1
+    // ponytail: v1 is first shipped backup schema; add migrations when schema changes.
+    public static let minimumSupportedVersion = 1
     /// Imports larger than this are rejected without parsing (PLAN bound).
     public static let maximumDocumentBytes = 2 * 1024 * 1024
 
@@ -25,6 +27,7 @@ public enum SeatingBackup {
         case unsupportedVersion(found: Int)
         case undecodable(underlying: String)
         case duplicateGuestIDs
+        case duplicatePreferenceIDs
         case duplicateVariantIDs
         case duplicateTableIDs(variantName: String)
         case danglingPreference(preferenceID: UUID)
@@ -32,17 +35,23 @@ public enum SeatingBackup {
         case invalidSeatCount(variantName: String, tableLabel: String)
         case limitsExceeded(detail: String)
         case seatOccupiedTwice(variantName: String, tableLabel: String, seatNumber: Int)
+        case guestSeatedTwice(variantName: String)
 
         public var errorDescription: String? {
             switch self {
             case .tooLarge(let bytes):
                 return "The backup is \(bytes) bytes, above the \(SeatingBackup.maximumDocumentBytes)-byte limit."
             case .unsupportedVersion(let found):
-                return "This file uses backup version \(found); this app reads version \(SeatingBackup.currentVersion) only."
+                if found < SeatingBackup.minimumSupportedVersion {
+                    return "This file uses backup version \(found). This app reads versions \(SeatingBackup.minimumSupportedVersion) through \(SeatingBackup.currentVersion); no supported migration exists for older files."
+                }
+                return "This file uses backup version \(found), which is newer than version \(SeatingBackup.currentVersion). Update the app before restoring it."
             case .undecodable(let underlying):
                 return "The backup could not be read: \(underlying)"
             case .duplicateGuestIDs:
                 return "The backup lists the same guest identity twice."
+            case .duplicatePreferenceIDs:
+                return "The backup lists the same preference identity twice."
             case .duplicateVariantIDs:
                 return "The backup lists the same plan identity twice."
             case .duplicateTableIDs(let variant):
@@ -57,6 +66,8 @@ public enum SeatingBackup {
                 return "The backup exceeds product limits: \(detail)"
             case .seatOccupiedTwice(let variant, let table, let seat):
                 return "Seat \(seat) of \(table) in plan \(variant) is assigned to more than one guest."
+            case .guestSeatedTwice(let variant):
+                return "Plan \(variant) seats one guest more than once."
             }
         }
     }
@@ -122,6 +133,9 @@ public enum SeatingBackup {
         if Set(event.guests.map(\.id)).count != event.guests.count {
             throw ImportError.duplicateGuestIDs
         }
+        if Set(event.preferences.map(\.id)).count != event.preferences.count {
+            throw ImportError.duplicatePreferenceIDs
+        }
         if Set(event.variants.map(\.id)).count != event.variants.count {
             throw ImportError.duplicateVariantIDs
         }
@@ -148,6 +162,7 @@ public enum SeatingBackup {
                 throw ImportError.invalidSeatCount(variantName: variant.name, tableLabel: table.label)
             }
             var occupied = Set<String>()
+            var seatedGuests = Set<UUID>()
             for assignment in variant.assignments {
                 guard guestIDs.contains(assignment.guestID), tableIDs.contains(assignment.tableID) else {
                     throw ImportError.danglingAssignment(variantName: variant.name)
@@ -161,6 +176,9 @@ public enum SeatingBackup {
                 guard !occupied.contains(key) else {
                     let label = variant.tables.first { $0.id == assignment.tableID }?.label ?? "?"
                     throw ImportError.seatOccupiedTwice(variantName: variant.name, tableLabel: label, seatNumber: assignment.seatNumber)
+                }
+                guard seatedGuests.insert(assignment.guestID).inserted else {
+                    throw ImportError.guestSeatedTwice(variantName: variant.name)
                 }
                 occupied.insert(key)
             }

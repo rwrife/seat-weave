@@ -7,12 +7,20 @@ import SeatingDomain
 final class StoreSaver: EventSaving, @unchecked Sendable {
     private let store: EventStore
     private let lock = NSLock()
+    private var failNextSave: Bool
 
-    init(store: EventStore) { self.store = store }
+    init(store: EventStore, failNextSave: Bool = false) {
+        self.store = store
+        self.failNextSave = failNextSave
+    }
 
     func save(_ event: SeatingEvent) throws {
         lock.lock()
         defer { lock.unlock() }
+        if failNextSave {
+            failNextSave = false
+            throw EventStore.StoreError.saveFailed(underlying: CocoaError(.fileWriteOutOfSpace))
+        }
         try store.save(event)
     }
 }
@@ -35,6 +43,10 @@ final class AppModel {
     /// XCTest launch flag: `-contentProbe` surfaces the environment
     /// Dynamic Type category for the issue #6 large-text journey.
     static let contentProbeKey = "contentProbe"
+    /// One-shot injected write failure for simulator tests only.
+    static let failNextSaveKey = "failNextSave"
+    private let failFirstEdit: Bool
+    private var didInjectSaveFailure = false
 
     private(set) var events: [SeatingEvent] = []
     private(set) var controller: PersistentSeatingController?
@@ -111,6 +123,9 @@ final class AppModel {
         self.defaults = defaults
         self.layoutToggleEnabled = defaults.bool(forKey: AppModel.layoutToggleKey)
         self.contentProbeEnabled = defaults.bool(forKey: AppModel.contentProbeKey)
+        self.failFirstEdit = ProcessInfo.processInfo.arguments.contains("-ui-testing")
+            && defaults.bool(forKey: AppModel.failNextSaveKey)
+        defaults.removeObject(forKey: AppModel.failNextSaveKey)
         if AppModel.resetStoreRequested {
             AppModel.wipeStoreDirectory()
             defaults.removeObject(forKey: AppModel.lastEventKey)
@@ -207,7 +222,9 @@ final class AppModel {
                 alertMessage = "That event is no longer stored."
                 return
             }
-            controller = PersistentSeatingController(event: event, saver: StoreSaver(store: store))
+            let inject = failFirstEdit && !didInjectSaveFailure
+            didInjectSaveFailure = true
+            controller = PersistentSeatingController(event: event, saver: StoreSaver(store: store, failNextSave: inject))
             reviewAcknowledgements = []
             let remembered = defaults.string(forKey: AppModel.lastVariantKey(eventID: eventID))
                 .flatMap(UUID.init(uuidString:))

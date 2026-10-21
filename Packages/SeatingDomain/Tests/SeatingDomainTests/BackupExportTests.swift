@@ -179,6 +179,42 @@ struct BackupExportTests {
         }
     }
 
+    @Test("Only shipped v1 backup schema is supported; older and newer files explain next step")
+    func unsupportedVersionsExplainRecovery() throws {
+        #expect(SeatingBackup.minimumSupportedVersion == 1)
+        let valid = try SeatingBackup.encodeBackup(of: makeEvent())
+        for version in [0, 99] {
+            var json = try #require(JSONSerialization.jsonObject(with: valid) as? [String: Any])
+            json["version"] = version
+            let data = try JSONSerialization.data(withJSONObject: json)
+            do {
+                _ = try SeatingBackup.decodeBackup(data)
+                Issue.record("Unsupported backup version was accepted")
+            } catch let error as SeatingBackup.ImportError {
+                #expect(error == .unsupportedVersion(found: version))
+                #expect(error.localizedDescription.contains(version == 0 ? "no supported migration" : "Update the app"))
+            }
+        }
+    }
+
+    @Test("Duplicate preference identity and double-seated guest are rejected before remapping")
+    func duplicateIdentityAndSeatRejected() throws {
+        let event = makeEvent()
+        let repeated = SeatingEvent(id: event.id, title: event.title, guests: event.guests,
+                                    preferences: event.preferences + [event.preferences[0]], variants: event.variants)
+        #expect(throws: SeatingBackup.ImportError.duplicatePreferenceIDs) {
+            try SeatingBackup.decodeBackup(try SeatingBackup.encodeBackup(of: repeated))
+        }
+        var variant = event.variants[0]
+        variant.assignments.append(SeatAssignment(guestID: event.guests[0].id,
+                                                  tableID: variant.tables[1].id, seatNumber: 2))
+        let doubleSeated = SeatingEvent(id: event.id, title: event.title, guests: event.guests,
+                                        preferences: event.preferences, variants: [variant])
+        #expect(throws: SeatingBackup.ImportError.guestSeatedTwice(variantName: "Plan A")) {
+            try SeatingBackup.decodeBackup(try SeatingBackup.encodeBackup(of: doubleSeated))
+        }
+    }
+
     @Test("Garbage and truncated files are rejected")
     func garbageRejected() throws {
         #expect(throws: (any Error).self) { try SeatingBackup.decodeBackup(Data("not json at all".utf8)) }
