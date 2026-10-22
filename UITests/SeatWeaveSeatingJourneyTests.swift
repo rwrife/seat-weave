@@ -181,6 +181,54 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
     }
 
     @MainActor
+    func testInjectedSaveFailureDoesNotClaimSuccessAndRetrySurvivesRelaunch() throws {
+        let app = launchApp(fresh: true)
+        let title = app.textFields["event-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        title.typeText("Synthetic retry\n")
+        app.buttons["create-event-button"].tap()
+        addGuest(app, name: "Aster")
+        selectTab(app, "Tables")
+        app.buttons["add-table-button"].tap()
+        let label = app.textFields["table-label-field"]
+        XCTAssertTrue(label.waitForExistence(timeout: 5))
+        label.tap()
+        label.typeText("Round1\n")
+        app.buttons["confirm-add-table"].tap()
+        app.terminate()
+
+        let failedLaunch = XCUIApplication()
+        failedLaunch.launchArguments = ["-ui-testing", "-resetStore", "NO", "-failNextSave", "YES"]
+        failedLaunch.launch()
+        XCTAssertTrue(failedLaunch.navigationBars["Synthetic retry"].waitForExistence(timeout: 10))
+        selectTab(failedLaunch, "Guests")
+        rosterButton(failedLaunch, "Aster").firstMatch.tap()
+        selectTab(failedLaunch, "Tables")
+        failedLaunch.buttons["seat-Round1-1"].tap()
+        let problem = failedLaunch.alerts["Problem"]
+        XCTAssertTrue(problem.waitForExistence(timeout: 10), "Save failure must be visible")
+        XCTAssertTrue(problem.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Saving failed")).firstMatch.exists)
+        problem.buttons["OK"].tap()
+        XCTAssertTrue(waitLabel(failedLaunch.buttons["seat-Round1-1"], containing: "Unseated"))
+        failedLaunch.terminate()
+
+        let reopened = launchApp(fresh: false)
+        XCTAssertTrue(reopened.navigationBars["Synthetic retry"].waitForExistence(timeout: 10))
+        selectTab(reopened, "Tables")
+        XCTAssertTrue(waitLabel(reopened.buttons["seat-Round1-1"], containing: "Unseated"))
+        selectTab(reopened, "Guests")
+        rosterButton(reopened, "Aster").firstMatch.tap()
+        selectTab(reopened, "Tables")
+        reopened.buttons["seat-Round1-1"].tap()
+        XCTAssertTrue(waitLabel(reopened.buttons["seat-Round1-1"], containing: "Aster"))
+        reopened.terminate()
+        let retried = launchApp(fresh: false)
+        selectTab(retried, "Tables")
+        XCTAssertTrue(waitLabel(retried.buttons["seat-Round1-1"], containing: "Aster"))
+    }
+
+    @MainActor
     func testCircularDiagramUsesSameSeatCommandsAndListRemainsAvailable() throws {
         let app = launchApp(fresh: true)
         let title = app.textFields["event-title-field"]
