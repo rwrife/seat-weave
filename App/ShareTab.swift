@@ -55,6 +55,9 @@ struct ShareTab: View {
     @State private var showRestorePicker = false
     @State private var showConfirmDeleteEvent = false
     @State private var showConfirmDeleteAll = false
+    @State private var showRecoverySheet = false
+    /// Event awaiting the permanent-delete confirmation (issue #16).
+    @State private var permanentDeleteTarget: EventStore.DeletedEvent?
 
     enum ExportKind: Int, Identifiable {
         case text, pdf, backupJSON
@@ -120,16 +123,47 @@ struct ShareTab: View {
                         .accessibilityIdentifier("restore-discard")
                 }
             }
+            Section("Automatic local recovery") {
+                Button("Browse recovery points…") {
+                    model.loadRecoveryPoints()
+                    showRecoverySheet = true
+                }
+                .disabled(model.event == nil)
+                .accessibilityIdentifier("recovery-browse-button")
+                Text("Every successful edit saves a private, versioned recovery point on this device; up to 10 per event for 14 days. Recovery contains guest names and pair preferences. It is never included in public exports. If storage is unavailable, save fails visibly and prior points remain untouched.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Delete") {
                 Button("Delete this event", role: .destructive) { showConfirmDeleteEvent = true }
                     .disabled(model.event == nil)
                     .accessibilityIdentifier("delete-event-button")
                 Button("Delete ALL events", role: .destructive) { showConfirmDeleteAll = true }
-                    .disabled(model.events.isEmpty)
+                    .disabled(model.events.isEmpty && model.recentlyDeleted.isEmpty)
                     .accessibilityIdentifier("delete-all-button")
-                Text("Copies you exported or shared earlier, and any device/OS backup of this data, stay outside the app's control after deletion.")
+                Text("Ordinary deletion moves this event into Recently Deleted for 14 days. Permanent deletion and Delete ALL remove local recovery points and recently-deleted copies. Files already exported or held in device/OS backups remain outside the app's control.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            if !model.recentlyDeleted.isEmpty {
+                Section("Recently Deleted — 14 days") {
+                    ForEach(model.recentlyDeleted) { deleted in
+                        VStack(alignment: .leading) {
+                            Text(deleted.title)
+                            Text("Deleted \(deleted.deletedAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Button("Recover \(deleted.title)") { model.restoreDeleted(id: deleted.id) }
+                                    .accessibilityIdentifier("recover-deleted-\(deleted.id.uuidString)")
+                                Button("Delete \(deleted.title) permanently", role: .destructive) {
+                                    permanentDeleteTarget = deleted
+                                }
+                                .accessibilityIdentifier("permanent-delete-\(deleted.id.uuidString)")
+                            }
+                        }
+                    }
+                }
             }
         }
         .sheet(isPresented: $showReview) {
@@ -148,6 +182,23 @@ struct ShareTab: View {
                 startExport(.backupJSON)
                 showBackupSheet = false
             }
+        }
+        .sheet(isPresented: $showRecoverySheet) {
+            RecoveryPointsSheet()
+        }
+        .confirmationDialog("Delete '\(permanentDeleteTarget?.title ?? "")' permanently?",
+                            isPresented: Binding(get: { permanentDeleteTarget != nil },
+                                                 set: { if !$0 { permanentDeleteTarget = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete permanently", role: .destructive) {
+                if let target = permanentDeleteTarget {
+                    model.deletePermanently(id: target.id)
+                    permanentDeleteTarget = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { permanentDeleteTarget = nil }
+        } message: {
+            Text("Removes the event, its automatic recovery points and this recently-deleted copy from this device. Nothing local can be recovered afterwards.")
         }
         .fileExporter(
             isPresented: Binding(get: { pendingExport != nil },
@@ -170,21 +221,21 @@ struct ShareTab: View {
                       allowsMultipleSelection: false) { result in
             handleRestorePick(result)
         }
-        .confirmationDialog("Delete this event? Every plan variant and preference is removed from this device.",
+        .confirmationDialog("Delete this event? It moves to Recently Deleted for 14 days.",
                             isPresented: $showConfirmDeleteEvent, titleVisibility: .visible) {
             Button("Delete event", role: .destructive) {
                 if let id = model.event?.id { model.deleteEvent(id: id) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Exported files and device/OS backups outside the app are not affected and cannot be recalled from here.")
+            Text("Automatic recovery snapshots and recently-deleted copies can restore it during the 14-day recovery period. Files you exported earlier stay outside the app's control.")
         }
-        .confirmationDialog("Delete ALL events? Gatherings, plans and preferences on this device are removed.",
+        .confirmationDialog("Delete ALL events and all recovery points? This is permanent.",
                             isPresented: $showConfirmDeleteAll, titleVisibility: .visible) {
             Button("Delete everything", role: .destructive) { model.deleteAllEvents() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Copies already exported or held in device/OS backups remain outside the app's control.")
+            Text("Removes all active events, all recently-deleted events and all automatic recovery snapshots from this device. Nothing local can be recovered afterwards.")
         }
         .modifier(FailureAlertModifier())
     }
@@ -413,6 +464,65 @@ struct BackupSheet: View {
             Button("Cancel", role: .cancel) { dismiss() }
         }
         .padding(24)
+    }
+}
+
+// MARK: - Recovery points browser (issue #16)
+
+/// Host-only list of the open event's automatic snapshots with timestamps
+/// and counts. Preview validates the stored document WITHOUT writing;
+/// restore always creates a NEW event and never overwrites the current one.
+struct RecoveryPointsSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // Preview section FIRST: it must be visible without
+                // scrolling on compact phones (lazy List otherwise never
+                // realizes it below the points list).
+                if let pending = model.pendingRecovery {
+                    Section("Recovery preview") {
+                        Text("Restore '\(pending.summary.title)' from \(pending.createdAt.formatted(date: .abbreviated, time: .shortened)) — \(pending.summary.guestCount) guest(s), \(pending.summary.preferenceCount) private preference(s), \(pending.summary.variantCount) plan(s).")
+                            .accessibilityIdentifier("recovery-preview-summary")
+                        Text("It becomes a NEW event with fresh identities. The current event is never overwritten.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Restore as new event") { model.restoreRecoveryPoint() }
+                            .accessibilityIdentifier("recovery-restore-confirm")
+                        Button("Discard", role: .cancel) { model.pendingRecovery = nil }
+                            .accessibilityIdentifier("recovery-preview-discard")
+                    }
+                }
+                Section("Automatic recovery points") {
+                    if model.recoveryPoints.isEmpty {
+                        Text("No recovery points yet. They appear after the first saved edit.")
+                    }
+                    ForEach(model.recoveryPoints) { point in
+                        VStack(alignment: .leading) {
+                            Text(point.createdAt.formatted(date: .abbreviated, time: .shortened))
+                            Text("\(point.guestCount) guest(s) · \(point.preferenceCount) private preference(s) · \(point.variantCount) plan(s)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Button("Preview \(point.createdAt.formatted(date: .omitted, time: .standard))") {
+                                    model.previewRecoveryPoint(point)
+                                }
+                                .accessibilityIdentifier("recovery-preview-\(point.id.uuidString)")
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Recovery points")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                        .accessibilityIdentifier("close-recovery-sheet")
+                }
+            }
+        }
     }
 }
 

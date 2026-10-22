@@ -180,6 +180,133 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         XCTAssertTrue(waitLabel(relaunched.buttons["seat-Round1-2"], containing: "Basil"))
     }
 
+    @MainActor
+    func testInjectedSaveFailureDoesNotClaimSuccessAndRetrySurvivesRelaunch() throws {
+        let app = launchApp(fresh: true)
+        let title = app.textFields["event-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        title.typeText("Synthetic retry\n")
+        app.buttons["create-event-button"].tap()
+        addGuest(app, name: "Aster")
+        selectTab(app, "Tables")
+        app.buttons["add-table-button"].tap()
+        let label = app.textFields["table-label-field"]
+        XCTAssertTrue(label.waitForExistence(timeout: 5))
+        label.tap()
+        label.typeText("Round1\n")
+        app.buttons["confirm-add-table"].tap()
+        app.terminate()
+
+        let failedLaunch = XCUIApplication()
+        failedLaunch.launchArguments = ["-ui-testing", "-resetStore", "NO", "-failNextSave", "YES"]
+        failedLaunch.launch()
+        XCTAssertTrue(failedLaunch.navigationBars["Synthetic retry"].waitForExistence(timeout: 10))
+        selectTab(failedLaunch, "Guests")
+        rosterButton(failedLaunch, "Aster").firstMatch.tap()
+        selectTab(failedLaunch, "Tables")
+        failedLaunch.buttons["seat-Round1-1"].tap()
+        let problem = failedLaunch.alerts["Problem"]
+        XCTAssertTrue(problem.waitForExistence(timeout: 10), "Save failure must be visible")
+        XCTAssertTrue(problem.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Saving failed")).firstMatch.exists)
+        problem.buttons["OK"].tap()
+        XCTAssertTrue(waitLabel(failedLaunch.buttons["seat-Round1-1"], containing: "Unseated"))
+        failedLaunch.terminate()
+
+        let reopened = launchApp(fresh: false)
+        XCTAssertTrue(reopened.navigationBars["Synthetic retry"].waitForExistence(timeout: 10))
+        selectTab(reopened, "Tables")
+        XCTAssertTrue(waitLabel(reopened.buttons["seat-Round1-1"], containing: "Unseated"))
+        selectTab(reopened, "Guests")
+        rosterButton(reopened, "Aster").firstMatch.tap()
+        selectTab(reopened, "Tables")
+        reopened.buttons["seat-Round1-1"].tap()
+        XCTAssertTrue(waitLabel(reopened.buttons["seat-Round1-1"], containing: "Aster"))
+        reopened.terminate()
+        let retried = launchApp(fresh: false)
+        selectTab(retried, "Tables")
+        XCTAssertTrue(waitLabel(retried.buttons["seat-Round1-1"], containing: "Aster"))
+    }
+
+    @MainActor
+    func testCircularDiagramUsesSameSeatCommandsAndListRemainsAvailable() throws {
+        let app = launchApp(fresh: true)
+        let title = app.textFields["event-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        title.typeText("Synthetic circle\n")
+        app.buttons["create-event-button"].tap()
+        XCTAssertTrue(app.navigationBars["Synthetic circle"].waitForExistence(timeout: 10))
+        addGuest(app, name: "Aster")
+        selectTab(app, "Tables")
+        app.buttons["add-table-button"].tap()
+        let field = app.textFields["table-label-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Round1\n")
+        app.buttons["confirm-add-table"].tap()
+        XCTAssertTrue(app.buttons["seat-Round1-1"].waitForExistence(timeout: 8))
+        let picker = app.segmentedControls["table-view-picker"]
+        for _ in 0..<8 where !picker.isHittable { app.swipeUp() }
+        XCTAssertTrue(picker.isHittable)
+        picker.buttons["Circular diagram"].tap()
+        let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "diagram-seat-")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        XCTAssertTrue(first.label.contains("seat 1"))
+        XCTAssertTrue(first.label.contains("Empty"))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "not a scaled floor plan")).firstMatch.exists)
+        picker.buttons["Seat list"].tap()
+        XCTAssertTrue(app.buttons["seat-Round1-1"].waitForExistence(timeout: 10))
+        app.buttons["seat-Round1-1"].tap() // empty seat without selected guest does not assign
+        XCTAssertTrue(app.buttons["seat-Round1-1"].label.contains("Unseated"))
+        selectTab(app, "Guests")
+        rosterButton(app, "Aster").firstMatch.tap()
+        selectTab(app, "Tables")
+        for _ in 0..<8 where !picker.isHittable { app.swipeUp() }
+        picker.buttons["Circular diagram"].tap()
+        first.tap()
+        XCTAssertTrue(waitIdentifiedLabel(app, identifier: "seating.summary", containing: "1 seated"))
+        picker.buttons["Seat list"].tap()
+        XCTAssertTrue(waitLabel(app.buttons["seat-Round1-1"], containing: "Aster"))
+        app.buttons["undo-button"].tap()
+        XCTAssertTrue(waitLabel(app.buttons["seat-Round1-1"], containing: "Unseated"))
+    }
+
+    @MainActor
+    func testFinalLockPersistsAndExplicitUnlockAllowsEdits() throws {
+        let app = launchApp(fresh: true)
+        let title = app.textFields["event-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        title.typeText("Synthetic final\n")
+        app.buttons["create-event-button"].tap()
+        XCTAssertTrue(app.navigationBars["Synthetic final"].waitForExistence(timeout: 10))
+        selectTab(app, "Plans")
+        let lock = app.buttons["lock-final-plan"]
+        XCTAssertTrue(lock.waitForExistence(timeout: 10))
+        lock.tap()
+        XCTAssertTrue(app.buttons["Mark final and lock"].waitForExistence(timeout: 5))
+        app.buttons["Mark final and lock"].tap()
+        XCTAssertTrue(waitIdentifiedLabel(app, identifier: "final-plan-status", containing: "Locked"))
+        app.terminate()
+        let resumed = launchApp(fresh: false)
+        XCTAssertTrue(resumed.navigationBars["Synthetic final"].waitForExistence(timeout: 10))
+        selectTab(resumed, "Plans")
+        XCTAssertTrue(waitIdentifiedLabel(resumed, identifier: "final-plan-status", containing: "Locked"))
+        resumed.buttons["unlock-final-plan"].tap()
+        XCTAssertTrue(resumed.buttons["Unlock plan"].waitForExistence(timeout: 5))
+        resumed.buttons["Unlock plan"].tap()
+        XCTAssertTrue(resumed.buttons["lock-final-plan"].waitForExistence(timeout: 10))
+        selectTab(resumed, "Tables")
+        resumed.buttons["add-table-button"].tap()
+        let field = resumed.textFields["table-label-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Round2\n")
+        resumed.buttons["confirm-add-table"].tap()
+        XCTAssertTrue(resumed.buttons["seat-Round2-1"].waitForExistence(timeout: 10))
+    }
+
     private func addGuest(_ app: XCUIApplication, name: String) {
         let field = app.textFields["add-guest-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))

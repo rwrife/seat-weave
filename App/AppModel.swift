@@ -7,12 +7,20 @@ import SeatingDomain
 final class StoreSaver: EventSaving, @unchecked Sendable {
     private let store: EventStore
     private let lock = NSLock()
+    private var failNextSave: Bool
 
-    init(store: EventStore) { self.store = store }
+    init(store: EventStore, failNextSave: Bool = false) {
+        self.store = store
+        self.failNextSave = failNextSave
+    }
 
     func save(_ event: SeatingEvent) throws {
         lock.lock()
         defer { lock.unlock() }
+        if failNextSave {
+            failNextSave = false
+            throw EventStore.StoreError.saveFailed(underlying: CocoaError(.fileWriteOutOfSpace))
+        }
         try store.save(event)
     }
 }
@@ -35,6 +43,10 @@ final class AppModel {
     /// XCTest launch flag: `-contentProbe` surfaces the environment
     /// Dynamic Type category for the issue #6 large-text journey.
     static let contentProbeKey = "contentProbe"
+    /// One-shot injected write failure for simulator tests only.
+    static let failNextSaveKey = "failNextSave"
+    private let failFirstEdit: Bool
+    private var didInjectSaveFailure = false
 
     private(set) var events: [SeatingEvent] = []
     private(set) var controller: PersistentSeatingController?
@@ -52,6 +64,8 @@ final class AppModel {
     /// orientation changes and region switches must not reset it, and
     /// resizing never mutates assignments or focus.
     var focusedTableID: UUID?
+    /// View choice stays in app state across tabs and width changes; seat list is the default.
+    var showTableDiagram = false
     /// Acknowledgements are host-only and session-local. Relaunch forces a
     /// fresh review; edits prune keys immediately at the save boundary.
     private(set) var reviewAcknowledgements: Set<ConflictAcknowledgement> = []
@@ -75,6 +89,19 @@ final class AppModel {
     }
     var pendingRestore: PendingRestore?
 
+    /// Recently-deleted events (issue #16), refreshed with the event list.
+    private(set) var recentlyDeleted: [EventStore.DeletedEvent] = []
+    /// A validated recovery point waiting for explicit restore (issue #16).
+    struct PendingRecovery {
+        let pointID: UUID
+        let event: SeatingEvent
+        let summary: SeatingBackup.RestoreSummary
+        let createdAt: Date
+    }
+    var pendingRecovery: PendingRecovery?
+    /// Recovery points for the open event, loaded on demand by the Share tab.
+    private(set) var recoveryPoints: [EventStore.RecoveryPoint] = []
+
     var selectedVariant: PlanVariant? {
         guard let event, let selectedVariantID else { return nil }
         return event.variant(selectedVariantID)
@@ -96,6 +123,9 @@ final class AppModel {
         self.defaults = defaults
         self.layoutToggleEnabled = defaults.bool(forKey: AppModel.layoutToggleKey)
         self.contentProbeEnabled = defaults.bool(forKey: AppModel.contentProbeKey)
+        self.failFirstEdit = ProcessInfo.processInfo.arguments.contains("-ui-testing")
+            && defaults.bool(forKey: AppModel.failNextSaveKey)
+        defaults.removeObject(forKey: AppModel.failNextSaveKey)
         if AppModel.resetStoreRequested {
             AppModel.wipeStoreDirectory()
             defaults.removeObject(forKey: AppModel.lastEventKey)
@@ -116,7 +146,11 @@ final class AppModel {
             defaults.synchronize()
         }
         self.store = AppModel.makeStore()
-        refreshEventList()
+        if store == nil {
+            alertMessage = "Local storage is unavailable. Nothing can be saved until storage is restored."
+        } else {
+            refreshEventList()
+        }
     }
 
     private static func storeDirectory() -> URL {
@@ -138,8 +172,10 @@ final class AppModel {
     func refreshEventList() {
         do {
             events = try store.map { try $0.allEvents() } ?? []
+            recentlyDeleted = try store?.recentlyDeleted() ?? []
         } catch {
             events = []
+            recentlyDeleted = []
             alertMessage = "Stored events could not be read: \(error.localizedDescription)"
         }
     }
@@ -186,7 +222,9 @@ final class AppModel {
                 alertMessage = "That event is no longer stored."
                 return
             }
-            controller = PersistentSeatingController(event: event, saver: StoreSaver(store: store))
+            let inject = failFirstEdit && !didInjectSaveFailure
+            didInjectSaveFailure = true
+            controller = PersistentSeatingController(event: event, saver: StoreSaver(store: store, failNextSave: inject))
             reviewAcknowledgements = []
             let remembered = defaults.string(forKey: AppModel.lastVariantKey(eventID: eventID))
                 .flatMap(UUID.init(uuidString:))
@@ -208,6 +246,8 @@ final class AppModel {
         selectedGuestID = nil
         focusedTableID = nil
         reviewAcknowledgements = []
+        recoveryPoints = []
+        pendingRecovery = nil
         compactTab = .guests
         regularTab = .tables
         layoutOverride = .auto
@@ -323,8 +363,65 @@ final class AppModel {
         }
     }
 
-    /// Deletes one event after UI confirmation. An open controller on that
-    /// event is closed first; the remembered-launch keys are cleared.
+    // MARK: - Automatic recovery (issue #16)
+
+    func loadRecoveryPoints() {
+        guard let store, let event else { return }
+        do {
+            recoveryPoints = try store.recoveryPoints(eventID: event.id)
+        } catch {
+            alertMessage = "Recovery points could not be read: \(error.localizedDescription)"
+        }
+    }
+
+    func previewRecoveryPoint(_ point: EventStore.RecoveryPoint) {
+        guard let store else { return }
+        do {
+            let (event, summary) = try store.previewRecoveryPoint(id: point.id)
+            pendingRecovery = PendingRecovery(pointID: point.id, event: event,
+                                              summary: summary, createdAt: point.createdAt)
+        } catch {
+            pendingRecovery = nil
+            alertMessage = "Recovery preview failed: \(error.localizedDescription)"
+        }
+    }
+
+    func restoreRecoveryPoint() {
+        guard let store, let pendingRecovery else { return }
+        do {
+            let restored = try store.restoreRecoveryPoint(id: pendingRecovery.pointID)
+            self.pendingRecovery = nil
+            refreshEventList()
+            alertMessage = "Recovered '\(restored.title)' as a new event. Your current event is unchanged."
+        } catch {
+            alertMessage = "Recovery failed: \(error.localizedDescription)"
+        }
+    }
+
+    func restoreDeleted(id: UUID) {
+        guard let store else { return }
+        do {
+            try store.restoreDeleted(eventID: id)
+            refreshEventList()
+        } catch {
+            alertMessage = "Recently deleted recovery failed: \(error.localizedDescription)"
+        }
+    }
+
+    func deletePermanently(id: UUID) {
+        guard let store else { return }
+        if event?.id == id { closeEvent() }
+        do {
+            try store.deletePermanently(eventID: id)
+            clearLaunchKeys(eventID: id)
+            refreshEventList()
+        } catch {
+            alertMessage = "Permanent deletion failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Moves one event into recently-deleted after confirmation. An open
+    /// controller on that event is closed first; relaunch keys are cleared.
     func deleteEvent(id: UUID) {
         guard let store else {
             alertMessage = "Local storage is unavailable."
