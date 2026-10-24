@@ -137,7 +137,8 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         // Drag in the 16–32pt cell inset gutter instead: outside every
         // control's hit region, clear of the bar, beyond the ~10pt system
         // edge-swipe. Plain buttons (seat rows) never claim the pan.
-        let gutterX: CGFloat = app.tabBars.buttons["Share"].isSelected
+        let shareTab = app.tabBars.buttons["Share"]
+        let gutterX: CGFloat = shareTab.exists && shareTab.isSelected
             ? 24 / appFrame.width
             : 0.5
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - appFrame.minY) / appFrame.height))
@@ -251,7 +252,8 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         // Same Share-tab gutter rule as contentBandDrag: menu-style export
         // pickers would claim a center-anchored nudge there.
         let origin = app.frame
-        let gutterX: CGFloat = app.tabBars.buttons["Share"].isSelected
+        let shareTab = app.tabBars.buttons["Share"]
+        let gutterX: CGFloat = shareTab.exists && shareTab.isSelected
             ? 24 / origin.width
             : 0.5
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - origin.minY) / origin.height))
