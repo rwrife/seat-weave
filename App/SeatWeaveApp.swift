@@ -9,6 +9,14 @@ struct SeatWeaveApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
+                .task {
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("-export-fixtures") {
+                        do { try SeatingPDFRenderer.writeTestFixtures() }
+                        catch { model.alertMessage = "Fixture generation failed: \(error.localizedDescription)" }
+                    }
+                    #endif
+                }
         }
     }
 }
