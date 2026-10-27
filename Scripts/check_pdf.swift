@@ -32,6 +32,13 @@ for layout in ["tableOrder", "alphabeticalLookup"] {
                 try png.write(to: folder.appendingPathComponent("\(name)-page\(index + 1).png"), options: .atomic)
             }
         }
+        let expectedOrder = layout == "alphabeticalLookup" ? Array(1...40) :
+            (0..<6).flatMap { table in (0..<7).map { table + $0 * 6 + 1 }.filter { $0 <= 40 } }
+        let positions = expectedOrder.map { number in
+            contents.range(of: String(format: "SYNTHETIC%02d", number))!.lowerBound
+        }
+        precondition(zip(positions, positions.dropFirst()).allSatisfy { $0 < $1 },
+                     "Selected layout did not order the exported rows: \(name)")
         for number in 1...40 {
             let marker = String(format: "SYNTHETIC%02d", number)
             let endMarker = String(format: "END%02d", number)
@@ -57,7 +64,8 @@ for layout in ["tableOrder", "alphabeticalLookup"] {
         }
         precondition(!contents.localizedCaseInsensitiveContains("preference") &&
                      !contents.localizedCaseInsensitiveContains("unseated") &&
-                     !contents.localizedCaseInsensitiveContains("warning"), "Private data in \(name)")
+                     !contents.localizedCaseInsensitiveContains("warning") &&
+                     !contents.contains("PRIVATE_OTHER_VARIANT"), "Private data leaked into \(name)")
         print("PASS \(name): \(doc.pageCount) pages, 40 unique synthetic guests, page sizes/headings; PNG first/last")
     }
 }

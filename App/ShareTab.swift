@@ -554,19 +554,30 @@ enum SeatingPDFRenderer {
         let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("export-fixtures", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let guests = (1...40).map { number in
+            GuestIdentity(displayName: String(format: "SYNTHETIC%02d", number) + " " +
+                String(repeating: "Long Unicode Zoë Nguyễn 李 👩🏽‍💻 ", count: 5) +
+                String(format: " END%02d", number))
+        }
+        let tables = (1...6).map { SeatingTable(label: "Round \($0)", seatCount: 7) }
+        let assignments = guests.enumerated().map { index, guest in
+            SeatAssignment(guestID: guest.id, tableID: tables[index % 6].id,
+                           seatNumber: index / 6 + 1)
+        }
+        let selected = PlanVariant(name: "Selected plan", tables: tables, assignments: assignments)
+        let other = PlanVariant(name: "PRIVATE_OTHER_VARIANT", tables: [])
+        let event = SeatingEvent(title: "Synthetic print verification", guests: guests,
+            preferences: [PairPreference(firstGuestID: guests[0].id, secondGuestID: guests[1].id,
+                                         kind: .differentTables)], variants: [selected, other])
         for paper in PublicExportPaperSize.allCases {
             for layout in PublicExportLayout.allCases {
-                let rows = (1...40).map {
-                    PublicSeatingExport.Row(tableLabel: "Round \(($0 - 1) % 6 + 1)",
-                        seatNumber: ($0 - 1) / 6 + 1,
-                        displayName: String(format: "SYNTHETIC%02d", $0) + " " +
-                            String(repeating: "Long Unicode Zoë Nguyễn 李 👩🏽‍💻 ", count: 5) +
-                            String(format: " END%02d", $0))
-                }
-                let export = PublicSeatingExport(eventTitle: "Synthetic print verification",
-                    planName: "Selected plan", layout: layout, paperSize: paper, rows: rows)
-                try render(export).write(to: folder.appendingPathComponent("\(layout.rawValue)-\(paper.rawValue).pdf"),
-                                         options: .atomic)
+                // Exercise the same selected-plan builder as ShareTab, not a
+                // hand-built row array that can bypass ordering/privacy bugs.
+                let preview = try PublicExportBuilder.preview(event: event, variantID: selected.id,
+                                                              layout: layout, paperSize: paper)
+                try render(preview.export).write(
+                    to: folder.appendingPathComponent("\(layout.rawValue)-\(paper.rawValue).pdf"),
+                    options: .atomic)
             }
         }
         try render(PublicSeatingExport(eventTitle: "Empty synthetic event", planName: "Empty", rows: []))
