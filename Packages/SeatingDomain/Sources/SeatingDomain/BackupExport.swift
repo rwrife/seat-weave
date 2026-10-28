@@ -226,6 +226,25 @@ public enum SeatingBackup {
 
 // MARK: - Public seating export (selected plan only)
 
+public enum PublicExportLayout: String, Codable, CaseIterable, Sendable {
+    case tableOrder = "tableOrder"
+    case alphabeticalLookup = "alphabeticalLookup"
+}
+
+public enum PublicExportPaperSize: String, Codable, CaseIterable, Sendable {
+    case letter = "letter"
+    case a4 = "a4"
+
+    public var dimensionsInPoints: (width: Double, height: Double) {
+        switch self {
+        case .letter:
+            return (612.0, 792.0)
+        case .a4:
+            return (595.275590551181, 841.8897637795276)
+        }
+    }
+}
+
 /// The guest-facing document. There is deliberately no field for
 /// preferences, unseated guests, IDs or other variants.
 public struct PublicSeatingExport: Codable, Hashable, Sendable {
@@ -233,11 +252,33 @@ public struct PublicSeatingExport: Codable, Hashable, Sendable {
         public let tableLabel: String
         public let seatNumber: Int
         public let displayName: String
+
+        public init(tableLabel: String, seatNumber: Int, displayName: String) {
+            self.tableLabel = tableLabel
+            self.seatNumber = seatNumber
+            self.displayName = displayName
+        }
     }
 
     public let eventTitle: String
     public let planName: String
+    public let layout: PublicExportLayout
+    public let paperSize: PublicExportPaperSize
     public let rows: [Row]
+
+    public init(
+        eventTitle: String,
+        planName: String,
+        layout: PublicExportLayout = .tableOrder,
+        paperSize: PublicExportPaperSize = .letter,
+        rows: [Row]
+    ) {
+        self.eventTitle = eventTitle
+        self.planName = planName
+        self.layout = layout
+        self.paperSize = paperSize
+        self.rows = rows
+    }
 }
 
 /// Host-facing preview: the exact public text plus warnings that live ONLY
@@ -249,28 +290,50 @@ public struct PublicExportPreview: Hashable, Sendable {
 }
 
 public enum PublicExportBuilder {
-    /// Deterministic text export: `Table — Seat N: Name` lines, tables in
-    /// declaration order, seats ascending. Display names are single-lined
-    /// so one line always means one seat row; all other Unicode is kept.
-    public static func preview(event: SeatingEvent, variantID: UUID) throws -> PublicExportPreview {
+    /// Deterministic text export: `Table — Seat N: Name` lines (or alphabetical lookup lines),
+    /// display names single-lined so one line always means one seat row; all other Unicode is kept.
+    public static func preview(
+        event: SeatingEvent,
+        variantID: UUID,
+        layout: PublicExportLayout = .tableOrder,
+        paperSize: PublicExportPaperSize = .letter
+    ) throws -> PublicExportPreview {
         guard let variant = event.variant(variantID) else {
             throw CommandError("Unknown plan for export.")
         }
         var rows: [PublicSeatingExport.Row] = []
+
         for table in variant.tables {
-            let seated = variant.assignments
-                .filter { $0.tableID == table.id }
+            let seated = variant.assignments.filter { $0.tableID == table.id }
                 .sorted { $0.seatNumber < $1.seatNumber }
             for assignment in seated {
-                let name = event.guest(assignment.guestID)?.displayName ?? "Guest"
-                rows.append(.init(tableLabel: table.label, seatNumber: assignment.seatNumber,
-                                  displayName: singleLine(name)))
+                guard let guest = event.guest(assignment.guestID) else {
+                    throw CommandError("Unknown guest for export.")
+                }
+                rows.append(.init(tableLabel: singleLine(table.label), seatNumber: assignment.seatNumber,
+                                  displayName: singleLine(guest.displayName)))
             }
         }
-        let export = PublicSeatingExport(eventTitle: event.title, planName: variant.name, rows: rows)
-        var text = "\(event.title) — \(variant.name)\n"
+        if layout == .alphabeticalLookup {
+            // Declaration/seat order breaks locale-equivalent names without
+            // merging identities or publishing private IDs.
+            rows = rows.enumerated().sorted { lhs, rhs in
+                let comparison = lhs.element.displayName.localizedStandardCompare(rhs.element.displayName)
+                return comparison == .orderedSame ? lhs.offset < rhs.offset : comparison == .orderedAscending
+            }.map(\.element)
+        }
+
+        let export = PublicSeatingExport(
+            eventTitle: event.title,
+            planName: variant.name,
+            layout: layout,
+            paperSize: paperSize,
+            rows: rows
+        )
+
+        var text = "\(singleLine(event.title)) — \(singleLine(variant.name))\n"
         for row in export.rows {
-            text += "\(row.tableLabel) — Seat \(row.seatNumber): \(row.displayName)\n"
+            text += PublicPDFLayout.line(for: row, layout: layout) + "\n"
         }
         if export.rows.isEmpty {
             text += "No guests seated yet.\n"
@@ -307,12 +370,40 @@ public enum PublicExportBuilder {
 
 // MARK: - PDF pagination (pure and unit-tested)
 
-/// Row pagination for the PDF rendering of a public export. The renderer
-/// in the app draws exactly what this returns; the layout rules live here
-/// so pagination is testable without UIKit.
+/// Row pagination and line formatting for the PDF rendering of a public export.
+/// The renderer in the app draws exactly what this returns; the layout rules live
+/// here so pagination is testable without UIKit.
 public enum PublicPDFLayout {
-    /// Rows per page chosen for the fixed Letter-size layout.
+    /// Rows per page chosen for the fixed page layout.
     public static let rowsPerPage = 24
+
+    /// Pack measured row lines without splitting a guest across pages.
+    /// ponytail: A single row taller than a page is split; it cannot fit intact.
+    public static func paginateLines(_ rows: [[String]], capacity: Int) -> [[String]] {
+        precondition(capacity > 0)
+        var pages: [[String]] = [[]]
+        for row in rows {
+            guard !row.isEmpty else { continue }
+            if pages[pages.count - 1].count + row.count > capacity && !pages[pages.count - 1].isEmpty {
+                pages.append([])
+            }
+            for line in row {
+                if pages[pages.count - 1].count == capacity { pages.append([]) }
+                pages[pages.count - 1].append(line)
+            }
+        }
+        return pages
+    }
+
+    /// Formats the single row line for print based on layout.
+    public static func line(for row: PublicSeatingExport.Row, layout: PublicExportLayout) -> String {
+        switch layout {
+        case .tableOrder:
+            return "\(row.tableLabel) — Seat \(row.seatNumber): \(row.displayName)"
+        case .alphabeticalLookup:
+            return "\(row.displayName) — \(row.tableLabel), Seat \(row.seatNumber)"
+        }
+    }
 
     /// Pages of rows in declaration order; at least one page (possibly
     /// empty, which the renderer prints as "No guests seated yet.").
@@ -325,6 +416,13 @@ public enum PublicPDFLayout {
 
     /// Header line repeated on every page (page numbers aid reassembly).
     public static func header(_ export: PublicSeatingExport, page: Int, pageCount: Int) -> String {
-        "\(export.eventTitle) — \(export.planName) · page \(page) of \(pageCount)"
+        let layoutTag: String
+        switch export.layout {
+        case .tableOrder:
+            layoutTag = "Table order"
+        case .alphabeticalLookup:
+            layoutTag = "Alphabetical lookup"
+        }
+        return "\(export.eventTitle) — \(export.planName) · \(layoutTag) · page \(page) of \(pageCount)"
     }
 }
