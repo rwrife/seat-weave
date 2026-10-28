@@ -5,6 +5,16 @@ import unittest
 
 
 class FixtureConfigurationTests(unittest.TestCase):
+    def test_pdf_fixtures_run_before_ui_and_install_built_app(self):
+        script = (Path(__file__).resolve().parents[1] / "ci.sh").read_text()
+        fixtures = script.index('phase="pdf_fixtures"')
+        compact = script.index('phase="ui_tests"')
+        self.assertLess(script.index('phase="app_build"'), fixtures)
+        self.assertLess(fixtures, compact)
+        self.assertIn('simctl install "$simulator_udid" "$derived_data/Build/Products/Debug-iphonesimulator/SeatWeave.app"',
+                      script[fixtures:compact])
+        self.assertIn('Scripts/check_pdf.swift', script[fixtures:compact])
+
     def test_debug_only_fixture_compilation(self):
         project = (Path(__file__).resolve().parents[2] /
                    "SeatWeave.xcodeproj/project.pbxproj").read_text()
