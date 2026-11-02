@@ -226,6 +226,41 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         let retried = launchApp(fresh: false)
         selectTab(retried, "Tables")
         XCTAssertTrue(waitLabel(retried.buttons["seat-Round1-1"], containing: "Aster"))
+
+        // Restore a committed private point after the failed write/retry.
+        // It creates a distinct event; the source must survive another launch.
+        selectTab(retried, "Share")
+        let browse = retried.buttons["recovery-browse-button"]
+        for _ in 0..<8 where !browse.isHittable {
+            let lists = retried.collectionViews
+            XCTAssertGreaterThan(lists.count, 0)
+            lists.element(boundBy: lists.count - 1).swipeUp()
+        }
+        XCTAssertTrue(browse.isHittable)
+        browse.tap()
+        let preview = retried.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "recovery-preview-")
+        ).firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 8))
+        preview.tap()
+        XCTAssertTrue(retried.staticTexts["recovery-preview-summary"].waitForExistence(timeout: 5))
+        retried.buttons["recovery-restore-confirm"].tap()
+        let restoredAlert = retried.alerts["Problem"]
+        XCTAssertTrue(restoredAlert.waitForExistence(timeout: 8))
+        XCTAssertTrue(restoredAlert.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "as a new event")
+        ).firstMatch.exists)
+        restoredAlert.buttons["OK"].tap()
+        retried.buttons["close-recovery-sheet"].tap()
+        retried.buttons["close-event-button"].tap()
+        let copies = retried.buttons["open-event-Synthetic retry"]
+        XCTAssertTrue(copies.element(boundBy: 1).waitForExistence(timeout: 8),
+                      "Recovery must add a second event without replacing the source")
+        retried.terminate()
+        let afterRestore = launchApp(fresh: false)
+        XCTAssertTrue(afterRestore.navigationBars["Synthetic retry"].waitForExistence(timeout: 10))
+        afterRestore.buttons["close-event-button"].tap()
+        XCTAssertEqual(afterRestore.buttons["open-event-Synthetic retry"].count, 2)
     }
 
     @MainActor
