@@ -251,7 +251,10 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
             NSPredicate(format: "label CONTAINS %@", "as a new event")
         ).firstMatch.exists)
         restoredAlert.buttons["OK"].tap()
-        retried.buttons["close-recovery-sheet"].tap()
+        // Restoring a point changes the selected event and can dismiss its Share sheet.
+        let closeRecovery = retried.buttons["close-recovery-sheet"]
+        if closeRecovery.exists { closeRecovery.tap() }
+        XCTAssertTrue(retried.buttons["close-event-button"].waitForExistence(timeout: 8))
         retried.buttons["close-event-button"].tap()
         let copies = retried.buttons.matching(identifier: "open-event-Synthetic retry")
         XCTAssertTrue(copies.element(boundBy: 1).waitForExistence(timeout: 8),
