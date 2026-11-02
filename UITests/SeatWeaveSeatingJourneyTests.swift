@@ -253,14 +253,14 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         restoredAlert.buttons["OK"].tap()
         retried.buttons["close-recovery-sheet"].tap()
         retried.buttons["close-event-button"].tap()
-        let copies = retried.buttons["open-event-Synthetic retry"]
+        let copies = retried.buttons.matching(identifier: "open-event-Synthetic retry")
         XCTAssertTrue(copies.element(boundBy: 1).waitForExistence(timeout: 8),
                       "Recovery must add a second event without replacing the source")
         retried.terminate()
         let afterRestore = launchApp(fresh: false)
         XCTAssertTrue(afterRestore.navigationBars["Synthetic retry"].waitForExistence(timeout: 10))
         afterRestore.buttons["close-event-button"].tap()
-        XCTAssertEqual(afterRestore.buttons["open-event-Synthetic retry"].count, 2)
+        XCTAssertEqual(afterRestore.buttons.matching(identifier: "open-event-Synthetic retry").count, 2)
     }
 
     @MainActor
