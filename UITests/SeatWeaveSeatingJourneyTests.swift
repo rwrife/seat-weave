@@ -234,11 +234,12 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         let shareList = retried.collectionViews.firstMatch
         XCTAssertTrue(shareList.waitForExistence(timeout: 5))
         for _ in 0..<8 where !browse.isHittable {
-            // Scroll inside the list's left gutter: centered drags can start
-            // on controls or dense text and never advance a lazy section.
-            shareList.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.82))
+            // List frame extends behind the tab bar (y=584 on compact SE).
+            // Keep both drag points in its unobscured content band; otherwise
+            // the gesture starts on Guests and switches tabs instead of scrolling.
+            shareList.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.65))
                 .press(forDuration: 0.05, thenDragTo: shareList.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.08, dy: 0.18)))
+                    withNormalizedOffset: CGVector(dx: 0.08, dy: 0.15)))
         }
         XCTAssertTrue(browse.isHittable, retried.debugDescription)
         browse.tap()

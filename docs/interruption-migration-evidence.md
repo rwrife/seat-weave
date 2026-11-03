@@ -17,7 +17,8 @@ Synthetic fixtures only. This page records test procedures; PR checks and exact-
 
 ## CI repairs
 
-- Exact-head run [41448773777](https://github.com/rwrife/seat-weave/actions/runs/41448773777), head `2164d546b9919e89271af58bc994b042b3fa3e6e`: measured Xcode 26.0.1 (17A400) and SDK 26.0; domain tests and app build passed, but compact suite failed 1/8 at `SeatWeaveSeatingJourneyTests.swift:239`. Eight center swipes on the Share collection view never made `recovery-browse-button` hittable. The new test now drags inside the Share list's left gutter and includes the synthetic UI hierarchy on failure. This repair needs a fresh exact-head native run; the failed run proves neither UI restoration nor iPad/large-text execution.
+- Exact-head run [41448773777](https://github.com/rwrife/seat-weave/actions/runs/41448773777), head `2164d546b9919e89271af58bc994b042b3fa3e6e`: measured Xcode 26.0.1 (17A400) and SDK 26.0; domain tests and app build passed, but compact suite failed 1/8 at `SeatWeaveSeatingJourneyTests.swift:239`. Eight center swipes never made `recovery-browse-button` hittable.
+- Exact-head run [41586081437](https://github.com/rwrife/seat-weave/actions/runs/41586081437), head `69e042c3a832587a62ca0e68d6fc29e8abf481ea`: same test failed 1/8 at line 243. Downloaded xcresult's compact log includes the failure-time accessibility tree: `Guests` tab selected and its roster visible, `Share` not selected, scroll bar at 0%. The left-gutter drag started at 82% of collection frame (y≈585), which overlaps the tab bar beginning at y=584; first gesture selected Guests rather than scrolling Share. Repair keeps both drag endpoints inside the visible content band (65% to 15%) and retains hierarchy diagnostics on failure. Fresh exact-head native run still required; no iPad/large-text proof from either failed run.
 
 ## Remaining acceptance
 
