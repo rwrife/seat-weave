@@ -231,12 +231,16 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         // It creates a distinct event; the source must survive another launch.
         selectTab(retried, "Share")
         let browse = retried.buttons["recovery-browse-button"]
+        let shareList = retried.collectionViews.firstMatch
+        XCTAssertTrue(shareList.waitForExistence(timeout: 5))
         for _ in 0..<8 where !browse.isHittable {
-            let lists = retried.collectionViews
-            XCTAssertGreaterThan(lists.count, 0)
-            lists.element(boundBy: lists.count - 1).swipeUp()
+            // Scroll inside the list's left gutter: centered drags can start
+            // on controls or dense text and never advance a lazy section.
+            shareList.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.82))
+                .press(forDuration: 0.05, thenDragTo: shareList.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.08, dy: 0.18)))
         }
-        XCTAssertTrue(browse.isHittable)
+        XCTAssertTrue(browse.isHittable, retried.debugDescription)
         browse.tap()
         let preview = retried.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "recovery-preview-")
