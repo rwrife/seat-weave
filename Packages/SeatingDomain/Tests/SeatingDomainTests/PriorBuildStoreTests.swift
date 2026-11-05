@@ -5,7 +5,8 @@ import Testing
 
 @Suite("Prior-build on-disk SwiftData migration")
 struct PriorBuildStoreTests {
-    @Test("Open pre-recovery SQLite store, preserve event, and save recovery point")
+    @Test("Open pre-recovery SQLite store, preserve event, and save recovery point",
+          .enabled(if: ProcessInfo.processInfo.environment["SEATWEAVE_LEGACY_STORE_DIR"] != nil))
     func migratePriorStore() throws {
         let path = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_LEGACY_STORE_DIR"])
         let directory = URL(fileURLWithPath: path, isDirectory: true)
