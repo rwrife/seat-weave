@@ -90,5 +90,35 @@ struct InterruptedEditsTests {
         #expect(try afterRestore.load(eventID: initial.id) == expected)
         #expect(try afterRestore.recoveryPoints(eventID: initial.id).count > 0)
     }
+
+    @Test("Rejected restore write leaves source intact and no partial copy; retry survives reopen")
+    func restoreFailureBoundary() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("seatweave-restore-failure-\(UUID().uuidString)", isDirectory: true)
+        let source = SeatingEvent(title: "Synthetic restore", guests: [GuestIdentity(displayName: "Aster")],
+                                  variants: [PlanVariant(name: "Plan A")])
+        let store = try EventStore.makeFileStore(directory: directory)
+        try store.save(source)
+        let backup = try SeatingBackup.encodeBackup(of: source)
+        let restored = try SeatingBackup.decodeBackup(backup).event
+        #expect(restored.id != source.id)
+        let saver = Saver(store)
+        saver.armFailure()
+        #expect(throws: CocoaError.self) { try saver.save(restored) }
+
+        // Reopen instead of trusting the same ModelContext after a rejected write.
+        let afterFailure = try EventStore.makeFileStore(directory: directory)
+        #expect(try afterFailure.load(eventID: source.id) == source)
+        #expect(try afterFailure.load(eventID: restored.id) == nil)
+        #expect(try afterFailure.eventCount() == 1)
+        #expect(try afterFailure.recoveryPoints(eventID: restored.id).isEmpty)
+
+        try saver.save(restored)
+        let afterRetry = try EventStore.makeFileStore(directory: directory)
+        #expect(try afterRetry.load(eventID: source.id) == source)
+        #expect(try afterRetry.load(eventID: restored.id) == restored)
+        #expect(try afterRetry.eventCount() == 2)
+        #expect(try afterRetry.recoveryPoints(eventID: restored.id).count == 1)
+    }
 }
 #endif
