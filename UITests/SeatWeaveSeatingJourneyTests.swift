@@ -226,6 +226,49 @@ final class SeatWeaveSeatingJourneyTests: XCTestCase {
         let retried = launchApp(fresh: false)
         selectTab(retried, "Tables")
         XCTAssertTrue(waitLabel(retried.buttons["seat-Round1-1"], containing: "Aster"))
+
+        // Restore a committed private point after the failed write/retry.
+        // It creates a distinct event; the source must survive another launch.
+        selectTab(retried, "Share")
+        let browse = retried.buttons["recovery-browse-button"]
+        let shareList = retried.collectionViews.firstMatch
+        XCTAssertTrue(shareList.waitForExistence(timeout: 5))
+        for _ in 0..<8 where !browse.isHittable {
+            // List frame extends behind the tab bar (y=584 on compact SE).
+            // Keep both drag points in its unobscured content band; otherwise
+            // the gesture starts on Guests and switches tabs instead of scrolling.
+            shareList.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.65))
+                .press(forDuration: 0.05, thenDragTo: shareList.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.08, dy: 0.15)))
+        }
+        XCTAssertTrue(browse.isHittable, retried.debugDescription)
+        browse.tap()
+        let preview = retried.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "recovery-preview-")
+        ).firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 8))
+        preview.tap()
+        XCTAssertTrue(retried.staticTexts["recovery-preview-summary"].waitForExistence(timeout: 5))
+        retried.buttons["recovery-restore-confirm"].tap()
+        let restoredAlert = retried.alerts["Problem"]
+        XCTAssertTrue(restoredAlert.waitForExistence(timeout: 8))
+        XCTAssertTrue(restoredAlert.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "as a new event")
+        ).firstMatch.exists)
+        restoredAlert.buttons["OK"].tap()
+        // Restoring a point changes the selected event and can dismiss its Share sheet.
+        let closeRecovery = retried.buttons["close-recovery-sheet"]
+        if closeRecovery.exists { closeRecovery.tap() }
+        XCTAssertTrue(retried.buttons["close-event-button"].waitForExistence(timeout: 8))
+        retried.buttons["close-event-button"].tap()
+        let copies = retried.buttons.matching(identifier: "open-event-Synthetic retry")
+        XCTAssertTrue(copies.element(boundBy: 1).waitForExistence(timeout: 8),
+                      "Recovery must add a second event without replacing the source")
+        retried.terminate()
+        let afterRestore = launchApp(fresh: false)
+        XCTAssertTrue(afterRestore.navigationBars["Synthetic retry"].waitForExistence(timeout: 10))
+        afterRestore.buttons["close-event-button"].tap()
+        XCTAssertEqual(afterRestore.buttons.matching(identifier: "open-event-Synthetic retry").count, 2)
     }
 
     @MainActor
