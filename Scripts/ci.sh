@@ -92,6 +92,18 @@ xcrun swift test \
   --package-path Packages/SeatingDomain \
   2>&1 | tee "$artifact_dir/domain-tests.log"
 
+phase="prior_build_migration"
+if [[ "$(uname -s)" == Darwin ]]; then
+  # Private synthetic SQLite fixture stays outside uploaded artifacts.
+  legacy_dir="$(mktemp -d "$repo_root/build/legacy-store.XXXXXX")"
+  python3 Scripts/legacy_store_fixture.py "$legacy_dir" \
+    2>&1 | tee "$artifact_dir/legacy-store-fixture.log"
+  SEATWEAVE_LEGACY_STORE_DIR="$legacy_dir" xcrun swift test \
+    --package-path Packages/SeatingDomain \
+    --filter PriorBuildStoreTests \
+    2>&1 | tee "$artifact_dir/prior-build-migration.log"
+fi
+
 phase="app_build"
 xcodebuild build \
   -project SeatWeave.xcodeproj \
