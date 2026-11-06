@@ -124,13 +124,25 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         let (top, bottom) = contentBand(app)
         let appFrame = app.frame
         let mid = (top + bottom) / 2
-        // A short ~45-point drag at XCTest's slow velocity avoids flinging
-        // past rows in the ~130pt unobscured band at AX5XL.
+        // A short drag at XCTest's slow velocity avoids flinging past rows
+        // in the ~130pt unobscured band at AX5XL.
         let step: CGFloat = min(45, (bottom - top) * 0.35)
         let startY = downward ? min(bottom - 5, mid + step) : max(top + 5, mid - step)
         let endY = downward ? max(top + 5, mid - step) : min(bottom - 5, mid + step)
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - appFrame.minY) / appFrame.height))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - appFrame.minY) / appFrame.height))
+        // Share's menu-style export pickers span x 32–340 across the narrow
+        // AX5XL content band and steal the center pan (menu open instead of
+        // scroll): run 38374520424 froze at 58%. The right edge is no good
+        // either — the accessibility scroll bar container spans x 342–372
+        // and swallowed the drag in run 38520353799 (value pinned at 24%).
+        // Drag in the 16–32pt cell inset gutter instead: outside every
+        // control's hit region, clear of the bar, beyond the ~10pt system
+        // edge-swipe. Plain buttons (seat rows) never claim the pan.
+        let shareTab = app.tabBars.buttons["Share"]
+        let gutterX: CGFloat = shareTab.exists && shareTab.isSelected
+            ? 24 / appFrame.width
+            : 0.5
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - appFrame.minY) / appFrame.height))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (endY - appFrame.minY) / appFrame.height))
         // Press duration controls the initial hold, not drag velocity.
         // The default fast drag flung this list to 100% in run 37431466002.
         start.press(forDuration: 0.25, thenDragTo: end,
@@ -237,9 +249,15 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
         }
         // Use screen coordinates on the app rather than percentages of
         // the CollectionView: its frame extends UNDER the tab bar on AX5XL.
+        // Same Share-tab gutter rule as contentBandDrag: menu-style export
+        // pickers would claim a center-anchored nudge there.
         let origin = app.frame
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (startY - origin.minY) / origin.height))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: (endY - origin.minY) / origin.height))
+        let shareTab = app.tabBars.buttons["Share"]
+        let gutterX: CGFloat = shareTab.exists && shareTab.isSelected
+            ? 24 / origin.width
+            : 0.5
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (startY - origin.minY) / origin.height))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: gutterX, dy: (endY - origin.minY) / origin.height))
         // Press duration controls the initial hold, not drag velocity.
         // The default fast drag flung this list to 100% in run 37431466002.
         start.press(forDuration: 0.25, thenDragTo: end,
@@ -480,9 +498,11 @@ final class SeatWeaveLargeTextJourneyTests: XCTestCase {
 
         // Public export preview: the privacy contract holds at this size.
         tapTab(app, "Share")
-        // The host-only review card adds several AX-size pages before export.
-        // Keep small, overlay-safe drags; allow this known later row more time.
-        tap(app, identifier: "export-preview-button", timeout: 60)
+        // The host-only review card plus printable layout and paper pickers
+        // add several AX-size pages before export. Run 38520353799 proved
+        // each gutter drag costs ~9 s end to end and advances ~75 pt of an
+        // 11-page list; ~20 effective drags are needed. Budget for that.
+        tap(app, identifier: "export-preview-button", timeout: 240)
         let exportText = app.staticTexts["export-text"]
         XCTAssertTrue(exportText.waitForExistence(timeout: 10),
                       "export preview unusable at accessibility text size")

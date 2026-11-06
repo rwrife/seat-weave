@@ -15,7 +15,10 @@ concurrency:
 jobs:
   ios:
     runs-on: macos-15
-    timeout-minutes: 45
+    # Compact, large-text and regular-width suites each run on real simulators.
+    # Run 39743069450 attempt 3 reached regular-width compilation at minute 36
+    # after both earlier suites passed, then hit the 38-minute step limit.
+    timeout-minutes: 60
     env:
       TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -27,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Run pinned simulator validation
-        timeout-minutes: 38
+        timeout-minutes: 55
         run: Scripts/ci.sh "$TARGET_SHA"
 
       - name: Upload results and provenance

@@ -104,9 +104,26 @@ xcodebuild build \
   CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee "$artifact_dir/xcodebuild-build.log"
 
+# Issue #20: generate and check native PDF fixtures before lengthy UI journeys.
+# A build does not install the app; install it explicitly on the booted simulator.
+phase="pdf_fixtures"
+xcrun simctl terminate "$simulator_udid" com.infinityball.seatweave || true
+xcrun simctl install "$simulator_udid" "$derived_data/Build/Products/Debug-iphonesimulator/SeatWeave.app"
+xcrun simctl launch "$simulator_udid" com.infinityball.seatweave -ui-testing -resetStore YES -export-fixtures
+container_path="$(xcrun simctl get_app_container "$simulator_udid" com.infinityball.seatweave data)"
+for attempt in 1 2 3 4 5; do
+  [[ -f "$container_path/Documents/export-fixtures/alphabeticalLookup-a4.pdf" ]] && break
+  sleep 1
+done
+mkdir -p "$artifact_dir/pdf-fixtures"
+cp "$container_path"/Documents/export-fixtures/*.pdf "$artifact_dir/pdf-fixtures/"
+xcrun swift Scripts/check_pdf.swift "$artifact_dir/pdf-fixtures" \
+  2>&1 | tee "$artifact_dir/pdf-fixtures-check.log"
+xcrun simctl terminate "$simulator_udid" com.infinityball.seatweave || true
+
 # Compact-phone journeys (issue #3/#5) and the override-driven region
 # transitions (issue #4) run on the pinned iPhone destination at the
-# default content size.
+# default content size. They remain required even after fixture validation.
 phase="ui_tests"
 xcodebuild test \
   -project SeatWeave.xcodeproj \

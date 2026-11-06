@@ -1,7 +1,23 @@
 import SeatingDomain
 import SwiftUI
 import UIKit
+import PDFKit
 import UniformTypeIdentifiers
+
+struct SeatingPDFPreview: UIViewRepresentable {
+    let data: Data
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true
+        view.document = PDFDocument(data: data)
+        return view
+    }
+    func updateUIView(_ view: PDFView, context: Context) {
+        if view.document?.dataRepresentation() != data {
+            view.document = PDFDocument(data: data)
+        }
+    }  // ponytail: fixed preview snapshot; replace only when its bytes change.
+}
 
 /// Sharing and ownership screen (issue #5): the guest-facing public list,
 /// the full private backup, validated restore, and confirmed deletion.
@@ -22,6 +38,10 @@ struct ShareTab: View {
     @State private var previewBox: PreviewBox?
     @State private var showReview = false
     @State private var showBackupSheet = false
+    /// Issue #20: guest-facing lookup layout and paper size, chosen before
+    /// preview so what is previewed is exactly what is saved.
+    @State private var exportLayout: PublicExportLayout = .tableOrder
+    @State private var exportPaperSize: PublicExportPaperSize = .letter
     /// Fully built export waiting for the system save panel. The
     /// single-document `fileExporter` overload is the only one that
     /// supports `defaultFilename` on the iOS 26 SDK, so the document,
@@ -60,8 +80,20 @@ struct ShareTab: View {
                     .foregroundStyle(.secondary)
             }
             Section("Public seating list") {
+                Picker("Guest-facing layout", selection: $exportLayout) {
+                    Text("Table-by-table").tag(PublicExportLayout.tableOrder)
+                    Text("Alphabetical guest lookup").tag(PublicExportLayout.alphabeticalLookup)
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("export-layout-picker")
+                Picker("Paper size", selection: $exportPaperSize) {
+                    Text("US Letter").tag(PublicExportPaperSize.letter)
+                    Text("A4").tag(PublicExportPaperSize.a4)
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("export-paper-size-picker")
                 Button("Preview shared list") {
-                    if let preview = model.exportSelectedPlan() {
+                    if let preview = model.exportSelectedPlan(layout: exportLayout, paperSize: exportPaperSize) {
                         previewBox = PreviewBox(preview: preview)
                     }
                 }
@@ -360,6 +392,7 @@ struct ExportPreviewSheet: View {
     let preview: PublicExportPreview
     let onExport: (ShareTab.ExportKind) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var showPDF = false
 
     var body: some View {
         NavigationStack {
@@ -380,6 +413,8 @@ struct ExportPreviewSheet: View {
                     }
                 }
                 Section {
+                    Button("Preview PDF") { showPDF = true }
+                        .accessibilityIdentifier("export-preview-pdf")
                     Button("Save as text…") { onExport(.text) }
                         .accessibilityIdentifier("export-save-text")
                     Button("Save as PDF…") { onExport(.pdf) }
@@ -391,6 +426,18 @@ struct ExportPreviewSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                         .accessibilityIdentifier("close-export-preview")
+                }
+            }
+            .sheet(isPresented: $showPDF) {
+                NavigationStack {
+                    SeatingPDFPreview(data: SeatingPDFRenderer.render(preview.export))
+                        .navigationTitle("PDF preview")
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") { showPDF = false }
+                                    .accessibilityIdentifier("close-pdf-preview")
+                            }
+                        }
                 }
             }
         }
@@ -497,36 +544,95 @@ struct SharedFileDocument: FileDocument {
     }
 }
 
-/// Draws the public export into a paginated PDF. Pagination comes from the
-/// domain's `PublicPDFLayout` (unit-tested); this renderer only draws the
-/// rows it is given. Compiled by the pinned iOS CI.
+/// UIKit measures grapheme-wrapped rows in points, then paginates the same
+/// lines it draws. Domain row ordering/formatting is tested separately;
+/// actual PDF geometry and content require the native simulator gate.
 enum SeatingPDFRenderer {
+    #if DEBUG
+    /// Synthetic-only native fixture producer; never reads the host's event.
+    static func writeTestFixtures() throws {
+        let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("export-fixtures", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let guests = (1...40).map { number in
+            GuestIdentity(displayName: String(format: "SYNTHETIC%02d", number) + " " +
+                String(repeating: "Long Unicode Zoë Nguyễn 李 👩🏽‍💻 ", count: 5) +
+                String(format: " END%02d", number))
+        }
+        let tables = (1...6).map { SeatingTable(label: "Round \($0)", seatCount: 7) }
+        let assignments = guests.enumerated().map { index, guest in
+            SeatAssignment(guestID: guest.id, tableID: tables[index % 6].id,
+                           seatNumber: index / 6 + 1)
+        }
+        let selected = PlanVariant(name: "Selected plan", tables: tables, assignments: assignments)
+        let other = PlanVariant(name: "PRIVATE_OTHER_VARIANT", tables: [])
+        let event = SeatingEvent(title: "Synthetic print verification", guests: guests,
+            preferences: [PairPreference(firstGuestID: guests[0].id, secondGuestID: guests[1].id,
+                                         kind: .differentTables)], variants: [selected, other])
+        for paper in PublicExportPaperSize.allCases {
+            for layout in PublicExportLayout.allCases {
+                // Exercise the same selected-plan builder as ShareTab, not a
+                // hand-built row array that can bypass ordering/privacy bugs.
+                let preview = try PublicExportBuilder.preview(event: event, variantID: selected.id,
+                                                              layout: layout, paperSize: paper)
+                try render(preview.export).write(
+                    to: folder.appendingPathComponent("\(layout.rawValue)-\(paper.rawValue).pdf"),
+                    options: .atomic)
+            }
+        }
+        try render(PublicSeatingExport(eventTitle: "Empty synthetic event", planName: "Empty", rows: []))
+            .write(to: folder.appendingPathComponent("empty.pdf"), options: .atomic)
+    }
+    #endif
+
     static func render(_ export: PublicSeatingExport) -> Data {
-        let pages = PublicPDFLayout.pages(for: export)
-        let bounds = CGRect(x: 0, y: 0, width: 612, height: 792) // US Letter
-        let renderer = UIGraphicsPDFRenderer(bounds: bounds)
-        let titleFont = UIFont.systemFont(ofSize: 18, weight: .semibold)
-        let headerFont = UIFont.systemFont(ofSize: 12)
-        let rowFont = UIFont.systemFont(ofSize: 13)
-        return renderer.pdfData { context in
-            for (index, rows) in pages.enumerated() {
-                context.beginPage()
-                var y: CGFloat = 56
-                PublicPDFLayout.header(export, page: index + 1, pageCount: pages.count)
-                    .draw(at: CGPoint(x: 48, y: y),
-                          withAttributes: [.font: headerFont, .foregroundColor: UIColor.darkGray])
-                y += 28
-                export.eventTitle.draw(at: CGPoint(x: 48, y: y),
-                                       withAttributes: [.font: titleFont])
-                y += 36
-                if rows.isEmpty {
-                    "No guests seated yet."
-                        .draw(at: CGPoint(x: 48, y: y), withAttributes: [.font: rowFont])
+        let size = export.paperSize.dimensionsInPoints
+        let bounds = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        let margin: CGFloat = 48
+        let width = bounds.width - 2 * margin
+        let lineHeight: CGFloat = 19
+        let rowFont = UIFont.systemFont(ofSize: 12)
+        let attributes: [NSAttributedString.Key: Any] = [.font: rowFont]
+        // Break by grapheme, not UTF-16 index: no clipped long names or
+        // split combining marks. The same measured lines drive pagination.
+        func lines(_ text: String) -> [String] {
+            var result: [String] = []
+            var line = ""
+            for character in text {
+                let candidate = line + String(character)
+                if !line.isEmpty && (candidate as NSString).size(withAttributes: attributes).width > width {
+                    result.append(line)
+                    line = String(character)
+                } else {
+                    line = candidate
                 }
-                for row in rows {
-                    "\(row.tableLabel) — Seat \(row.seatNumber): \(row.displayName)"
-                        .draw(at: CGPoint(x: 48, y: y), withAttributes: [.font: rowFont])
-                    y += 22
+            }
+            result.append(line)
+            return result
+        }
+        // Reserve identical header/title space on every page. Titles are
+        // truncated in the heading only; every guest row remains complete.
+        let available = bounds.height - 2 * margin - 70
+        let capacity = max(1, Int(available / lineHeight))
+        let rowLines: [[String]] = export.rows.map {
+            lines(PublicPDFLayout.line(for: $0, layout: export.layout))
+        }
+        let pages: [[String]] = export.rows.isEmpty ? [["No guests seated yet."]] :
+            PublicPDFLayout.paginateLines(rowLines, capacity: capacity)
+        let renderer = UIGraphicsPDFRenderer(bounds: bounds)
+        return renderer.pdfData { context in
+            for (index, page) in pages.enumerated() {
+                context.beginPage()
+                let heading = PublicPDFLayout.header(export, page: index + 1, pageCount: pages.count)
+                (heading as NSString).draw(in: CGRect(x: margin, y: margin, width: width, height: 20),
+                                           withAttributes: [.font: UIFont.systemFont(ofSize: 11),
+                                                            .foregroundColor: UIColor.darkGray])
+                ((export.eventTitle + " — " + export.planName) as NSString)
+                    .draw(in: CGRect(x: margin, y: margin + 25, width: width, height: 29),
+                          withAttributes: [.font: UIFont.systemFont(ofSize: 18, weight: .semibold)])
+                for (offset, line) in page.enumerated() {
+                    (line as NSString).draw(at: CGPoint(x: margin, y: margin + 70 + CGFloat(offset) * lineHeight),
+                                            withAttributes: attributes)
                 }
             }
         }
