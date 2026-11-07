@@ -104,6 +104,9 @@ if [[ "$(uname -s)" == Darwin ]]; then
     2>&1 | tee "$artifact_dir/prior-build-migration.log"
 fi
 
+phase="killed_writer"
+python3 Scripts/kill_commit_writer.py 2>&1 | tee "$artifact_dir/killed-writer.log"
+
 phase="app_build"
 xcodebuild build \
   -project SeatWeave.xcodeproj \
