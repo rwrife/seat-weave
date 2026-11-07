@@ -13,14 +13,14 @@ struct CommitKillTests {
         let directory = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_DIR"])
         let root = URL(fileURLWithPath: directory, isDirectory: true)
         let store = try EventStore.makeFileStore(directory: root)
-        try store.save(SeatingEvent(id: id, title: "Synthetic committed"))
+        try store.save(SeatingEvent(id: id, title: "Synthetic committed", variants: [PlanVariant(name: "A")]))
         let paused = store.observingCommit {
             let marker = root.appendingPathComponent("at-commit")
             try! Data().write(to: marker)
             // Harness kills process group. Timeout ensures an orphan cannot hang CI.
             Thread.sleep(forTimeInterval: 90)
         }
-        try paused.save(SeatingEvent(id: id, title: "Synthetic interrupted"))
+        try paused.save(SeatingEvent(id: id, title: "Synthetic interrupted", variants: [PlanVariant(name: "A")]))
         Issue.record("Writer survived kill boundary")
     }
 
