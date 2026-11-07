@@ -92,6 +92,9 @@ xcrun swift test \
   --package-path Packages/SeatingDomain \
   2>&1 | tee "$artifact_dir/domain-tests.log"
 
+phase="killed_writer"
+python3 Scripts/kill_commit_writer.py 2>&1 | tee "$artifact_dir/killed-writer.log"
+
 phase="app_build"
 xcodebuild build \
   -project SeatWeave.xcodeproj \
