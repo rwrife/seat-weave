@@ -8,15 +8,18 @@ import os
 from pathlib import Path
 import signal
 import subprocess
-import sys
 import tempfile
 import time
 
 
-def run(root: Path) -> None:
+OPERATIONS = ("assignment", "swap", "resize", "duplicate", "restore")
+
+
+def verify_operation(root: Path, operation: str) -> None:
     with tempfile.TemporaryDirectory(prefix="seatweave-kill-") as temporary:
         directory = Path(temporary)
-        env = {**os.environ, "SEATWEAVE_KILL_DIR": str(directory)}
+        env = {**os.environ, "SEATWEAVE_KILL_DIR": str(directory),
+               "SEATWEAVE_KILL_OPERATION": operation}
         command = ["xcrun", "swift", "test", "--package-path",
                    str(root / "Packages/SeatingDomain"), "--filter", "CommitKillTests"]
         writer = subprocess.Popen(command, cwd=root,
@@ -35,7 +38,7 @@ def run(root: Path) -> None:
             writer.wait(timeout=15)
             if writer.returncode != -signal.SIGKILL:
                 raise RuntimeError(f"Writer not killed: {writer.returncode}")
-            print("Writer killed at pre-commit barrier; checking persisted snapshot", flush=True)
+            print(f"{operation}: writer killed at pre-commit barrier; checking persisted snapshot", flush=True)
         finally:
             if writer.poll() is None:
                 os.killpg(writer.pid, signal.SIGKILL)
@@ -43,7 +46,12 @@ def run(root: Path) -> None:
         subprocess.run(command, cwd=root,
                        env={**env, "SEATWEAVE_KILL_PHASE": "reader"},
                        check=True, timeout=300)
-        print("Reader reopened SQLite and saved again; test passed", flush=True)
+        print(f"{operation}: reader reopened SQLite and saved again; test passed", flush=True)
+
+
+def run(root: Path, execute=verify_operation) -> None:
+    for operation in OPERATIONS:
+        execute(root, operation)
 
 
 if __name__ == "__main__":

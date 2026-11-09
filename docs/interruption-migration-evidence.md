@@ -23,7 +23,11 @@ Synthetic fixtures only. This page records test procedures; PR checks and exact-
 - Combined prior-build migration and pre-commit kill harness into single branch `fix/issue-21-combined-native-20261108`.
 - Docker `swift:6.0` package: 84 tests passed; SwiftData-gated code excluded on Linux.
 - Python CI helpers: 31 tests passed; offline source audit: zero violations; `bash -n Scripts/ci.sh` and `git diff --check` passed.
-- Both individual capabilities already passed exact-head pinned macOS CI on PR #35 (run 42170796076) and PR #36 (run 42344714760). Pinned CI on this combined PR head exercises both in sequence before the full iOS simulator UI matrix.
+- Pinned macOS CI run [42452287597](https://github.com/rwrife/seat-weave/actions/runs/42452287597) SUCCESS on head `5ea60ffec7f8384d8bc986332a3f1811b222978e`; downloaded artifact provenance verified (`expected_sha=actual_sha`, `phase=complete`, `exit_status=0`, measured Xcode 26.0.1 build 17A400, SDK 26.0). Historical migration, pre-commit kill/reopen, domain suite (106 tests), compact UI (8 tests), large-text UI (1 test), and regular-width iPad UI (1 test) all passed.
+
+## 2026-11-09 interruption matrix extension
+
+- `Scripts/kill_commit_writer.py` now runs five isolated synthetic SQLite stores, each with a separate writer kill and reader reopen: assignment, swap, resize, duplicate, and private backup restore. `CommitKillTests` applies real domain commands before staging each new snapshot and recovery point; reader asserts exact old event (including guest identities and seat assignments), exactly one event/point, then checks a fresh save and reopen. Script orchestration has a Python unit check; actual SwiftData kill/reopen requires exact-head pinned macOS CI. The hook remains before `ModelContext.save()`; this does not prove death during SQLite commit/fsync, app force-quit on a physical iPhone, or power-loss durability.
 
 ## CI repairs
 
@@ -32,4 +36,4 @@ Synthetic fixtures only. This page records test procedures; PR checks and exact-
 
 ## Remaining acceptance
 
-Death during SQLite's actual commit/fsync, and physical-device power-loss behavior remain unverified; this test only verifies a process killed immediately before `ModelContext.save()`. Prior-build store migration, pre-commit kill/reopen, and injected-failure UI restore have each passed pinned CI on separate heads; the combined branch requires its exact-head run. Physical-device data-loss, offline and accessibility checks tracked by #6/#22. Signing/TestFlight tracked by #7. No private names, preferences or backup bytes in public artifacts; full private backup must stay local.
+Real force-quit during SQLite fsync and physical-device power loss remain unverified; this test only covers process termination before `ModelContext.save()`. Prior-build store migration, multi-operation pre-commit kill/reopen, and injected-failure UI restore have each passed pinned CI on separate heads; the combined branch requires its exact-head run. Physical-device data-loss, offline and accessibility checks tracked by #6/#22. Signing/TestFlight tracked by #7. No private names, preferences or backup bytes in public artifacts; full private backup must stay local.
