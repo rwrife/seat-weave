@@ -45,45 +45,73 @@ struct CommitKillTests {
         return commands.currentEvent
     }
 
-    @Test("Write old snapshot, then wait at new snapshot commit",
-          .enabled(if: ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"] == "writer"))
+    @Test("Write old snapshot, then wait before or after new snapshot commit",
+          .enabled(if: ["writer", "committed-writer"].contains(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"] ?? "")))
     func writer() throws {
         let directory = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_DIR"])
         let operation = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_OPERATION"])
+        let phase = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"])
         let root = URL(fileURLWithPath: directory, isDirectory: true)
         let store = try EventStore.makeFileStore(directory: root)
         let original = committed(operation)
         try store.save(original)
-        let paused = store.observingCommit {
-            let marker = root.appendingPathComponent("at-commit")
-            try! Data().write(to: marker)
-            // Harness kills process group. Timeout ensures an orphan cannot hang CI.
-            Thread.sleep(forTimeInterval: 90)
+        let change = try interrupted(operation, from: original)
+        if phase == "committed-writer" {
+            try store.save(change)
+            // Synthetic expected bytes stay in private temporary store, never artifacts.
+            try JSONEncoder().encode(change).write(to: root.appendingPathComponent("expected.json"))
+            try Data().write(to: root.appendingPathComponent("after-commit"))
+        } else {
+            let paused = store.observingCommit {
+                let marker = root.appendingPathComponent("at-commit")
+                try! Data().write(to: marker)
+                // Harness kills process group. Timeout ensures an orphan cannot hang CI.
+                Thread.sleep(forTimeInterval: 90)
+            }
+            try paused.save(change)
+            Issue.record("Writer survived pre-commit boundary")
+            return
         }
-        try paused.save(interrupted(operation, from: original))
-        Issue.record("Writer survived kill boundary")
+        Thread.sleep(forTimeInterval: 90)
+        Issue.record("Writer survived post-commit boundary")
     }
 
-    @Test("Only old snapshot and its point survive reopen",
-          .enabled(if: ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"] == "reader"))
+    @Test("Last committed snapshot and recovery point survive reopen",
+          .enabled(if: ["reader", "committed-reader"].contains(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"] ?? "")))
     func reader() throws {
         let directory = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_DIR"])
         let operation = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_OPERATION"])
+        let phase = try #require(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"])
         let root = URL(fileURLWithPath: directory, isDirectory: true)
         let store = try EventStore.makeFileStore(directory: root)
-        let event = committed(operation)
-        #expect(try store.eventCount() == 1)
-        #expect(try store.load(eventID: id) == event)
-        let points = try store.recoveryPoints(eventID: id)
-        #expect(points.count == 1)
-        let original = try store.previewRecoveryPoint(id: points[0].id)
-        #expect(original.event == event)
-        #expect(try store.allEvents() == [event])
-        try store.save(event)
+        let original = committed(operation)
+        let committed = phase == "committed-reader"
+        let expected: SeatingEvent
+        if committed {
+            expected = try JSONDecoder().decode(SeatingEvent.self,
+                from: Data(contentsOf: root.appendingPathComponent("expected.json")))
+        } else {
+            expected = original
+        }
+        let source = operation == "restore" ? original : expected
+        #expect(try store.eventCount() == (committed && operation == "restore" ? 2 : 1))
+        #expect(try store.load(eventID: source.id) == source)
+        #expect(try store.load(eventID: expected.id) == expected)
+        let points = try store.recoveryPoints(eventID: expected.id)
+        #expect(points.count == (committed && operation != "restore" ? 2 : 1))
+        let snapshots = try points.map { try store.previewRecoveryPoint(id: $0.id).event }
+        #expect(snapshots.contains(expected))
+        if committed && operation != "restore" {
+            #expect(snapshots.contains(original))
+        }
+        if committed && operation == "restore" {
+            #expect(try store.recoveryPoints(eventID: original.id).count == 1)
+        }
+        try store.save(expected)
         let reopened = try EventStore.makeFileStore(directory: root)
-        #expect(try reopened.load(eventID: id) == event)
-        #expect(try reopened.recoveryPoints(eventID: id).count == 2)
-        #expect(try reopened.eventCount() == 1)
+        #expect(try reopened.load(eventID: expected.id) == expected)
+        #expect(try reopened.recoveryPoints(eventID: expected.id).count == points.count + 1)
+        #expect(try reopened.eventCount() == (committed && operation == "restore" ? 2 : 1))
     }
 }
 #endif
