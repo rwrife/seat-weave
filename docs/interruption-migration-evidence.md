@@ -29,6 +29,10 @@ Synthetic fixtures only. This page records test procedures; PR checks and exact-
 
 - `Scripts/kill_commit_writer.py` now runs five isolated synthetic SQLite stores, each with a separate writer kill and reader reopen: assignment, swap, resize, duplicate, and private backup restore. `CommitKillTests` applies real domain commands before staging each new snapshot and recovery point; reader asserts exact old event (including guest identities and seat assignments), exactly one event/point, then checks a fresh save and reopen. Script orchestration has a Python unit check; actual SwiftData kill/reopen requires exact-head pinned macOS CI. The hook remains before `ModelContext.save()`; this does not prove death during SQLite commit/fsync, app force-quit on a physical iPhone, or power-loss durability.
 
+## 2026-11-10 post-commit interruption matrix (pending native CI)
+
+- Five additional synthetic stores kill the writer **after** `ModelContext.save()` returns and before the process exits (assignment, swap, resize, duplicate, private restore). A new process must recover the just-committed snapshot and recovery point; restore must retain both source and imported event. Each store then saves once more and reopens. Together with the existing pre-commit matrix, this checks both sides of the save call, not the unobservable interior of SQLite commit/fsync. Synthetic expected bytes and SQLite files remain in private runner temporary storage, never uploaded. Actual mid-commit interruption, power loss and physical-device behavior remain open.
+
 ## CI repairs
 
 - Exact-head run [41448773777](https://github.com/rwrife/seat-weave/actions/runs/41448773777), head `2164d546b9919e89271af58bc994b042b3fa3e6e`: measured Xcode 26.0.1 (17A400) and SDK 26.0; domain tests and app build passed, but compact suite failed 1/8 at `SeatWeaveSeatingJourneyTests.swift:239`. Eight center swipes never made `recovery-browse-button` hittable.
