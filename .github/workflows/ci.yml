@@ -15,7 +15,8 @@ concurrency:
 jobs:
   ios:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
+    # Prior-build SwiftData fixture adds one historical package compile before UI matrix.
     env:
       TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -23,11 +24,12 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
+          # Historical SwiftData fixture reads pinned pre-recovery sources from git history.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Run pinned simulator validation
-        timeout-minutes: 38
+        timeout-minutes: 55
         run: Scripts/ci.sh "$TARGET_SHA"
 
       - name: Upload results and provenance
