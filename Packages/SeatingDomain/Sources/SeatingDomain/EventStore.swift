@@ -82,18 +82,18 @@ public struct EventStore {
     public static let maximumPointBytes = SeatingBackup.maximumDocumentBytes
     private static let recoveryAge: TimeInterval = 14 * 24 * 60 * 60
     private let clock: () -> Date
-    private let beforeCommit: (() -> Void)?
+    private let beforeCommit: (() throws -> Void)?
 
     private init(container: ModelContainer, clock: @escaping () -> Date,
-                 beforeCommit: (() -> Void)? = nil) {
+                 beforeCommit: (() throws -> Void)? = nil) {
         self.container = container
         self.clock = clock
         self.beforeCommit = beforeCommit
     }
 
-    // Package tests use this hook to prove a writer is blocked at the SQLite
-    // commit boundary before killing its process; the app never supplies one.
-    func observingCommit(_ observer: @escaping () -> Void) -> EventStore {
+    // Package tests inject a failure or pause immediately before context.save().
+    // The app never supplies this hook; it cannot simulate a mid-fsync failure.
+    func observingCommit(_ observer: @escaping () throws -> Void) -> EventStore {
         EventStore(container: container, clock: clock, beforeCommit: observer)
     }
     public enum StoreError: Error, LocalizedError {
@@ -170,7 +170,7 @@ public struct EventStore {
         }
         do {
             try appendRecoveryPoint(event: event, document: data, context: context)
-            beforeCommit?()
+            try beforeCommit?()
             try context.save()
         } catch let error as StoreError {
             throw error

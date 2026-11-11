@@ -45,6 +45,43 @@ struct CommitKillTests {
         return commands.currentEvent
     }
 
+    @Test("Failed staged snapshot and recovery point leave last commit intact across reopen",
+          .enabled(if: ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"] == nil))
+    func rejectedCommitAndRetry() throws {
+        for operation in ["assignment", "swap", "resize", "duplicate", "restore"] {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("seatweave-reject-\(operation)-\(UUID().uuidString)",
+                                      isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let original = committed(operation)
+            let store = try EventStore.makeFileStore(directory: root)
+            try store.save(original)
+            let changed = try interrupted(operation, from: original)
+            let rejecting = store.observingCommit { throw CocoaError(.fileWriteOutOfSpace) }
+            do {
+                try rejecting.save(changed)
+                Issue.record("Staged \(operation) write unexpectedly succeeded")
+            } catch EventStore.StoreError.saveFailed {
+                // Failure after staging, before context.save().
+            }
+            let reopened = try EventStore.makeFileStore(directory: root)
+            #expect(try reopened.eventCount() == 1)
+            #expect(try reopened.load(eventID: original.id) == original)
+            #expect(try reopened.recoveryPoints(eventID: original.id).count == 1)
+            if operation == "restore" {
+                #expect(try reopened.load(eventID: changed.id) == nil)
+                #expect(try reopened.recoveryPoints(eventID: changed.id).isEmpty)
+            }
+            try reopened.save(changed)
+            let afterRetry = try EventStore.makeFileStore(directory: root)
+            #expect(try afterRetry.load(eventID: original.id) == (operation == "restore" ? original : changed))
+            #expect(try afterRetry.load(eventID: changed.id) == changed)
+            #expect(try afterRetry.eventCount() == (operation == "restore" ? 2 : 1))
+            #expect(try afterRetry.recoveryPoints(eventID: changed.id).count ==
+                    (operation == "restore" ? 1 : 2))
+        }
+    }
+
     @Test("Write old snapshot, then wait before or after new snapshot commit",
           .enabled(if: ["writer", "committed-writer"].contains(ProcessInfo.processInfo.environment["SEATWEAVE_KILL_PHASE"] ?? "")))
     func writer() throws {
