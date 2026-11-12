@@ -15,8 +15,8 @@ concurrency:
 jobs:
   ios:
     runs-on: macos-15
+    # Prior-build SwiftData fixture and compact, large-text and regular-width simulator suites.
     timeout-minutes: 60
-    # Prior-build SwiftData fixture adds one historical package compile before UI matrix.
     env:
       TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:

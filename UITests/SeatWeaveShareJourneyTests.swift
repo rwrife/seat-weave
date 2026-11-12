@@ -66,6 +66,10 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Guests"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["selection.current"].waitForExistence(timeout: 5))
         app.tabBars.buttons["Share"].tap()
+        // Select both export controls in the real Share screen. The chosen
+        // layout changes row order/format, while paper size changes PDF bounds.
+        chooseExportOption(app, picker: "export-layout-picker", option: "Alphabetical guest lookup")
+        chooseExportOption(app, picker: "export-paper-size-picker", option: "A4")
         // Returning from a host-only review still permits a draft; the
         // existing public preview asserts Basil and warnings stay private.
         let shareButton = app.buttons["export-preview-button"]
@@ -74,6 +78,8 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         shareButton.tap()
         let exportText = app.staticTexts["export-text"]
         XCTAssertTrue(exportText.waitForExistence(timeout: 5))
+        XCTAssertTrue(exportText.label.contains("Aster — Round1, Seat 1"),
+                      "the picked alphabetical lookup format must reach the shared text")
         XCTAssertTrue(exportText.label.contains("Aster"))
         XCTAssertFalse(exportText.label.contains("Basil"),
                        "unseated guests must never reach the shared list")
@@ -85,11 +91,29 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         )
         XCTAssertTrue(warning.element(boundBy: 0).waitForExistence(timeout: 5))
 
+        app.buttons["export-preview-pdf"].tap()
+        XCTAssertTrue(app.navigationBars["PDF preview"].waitForExistence(timeout: 8))
+        let pdfScreenshot = XCTAttachment(screenshot: app.screenshot())
+        pdfScreenshot.name = "Synthetic shared PDF preview"
+        pdfScreenshot.lifetime = .keepAlways
+        add(pdfScreenshot)
+        app.buttons["close-pdf-preview"].tap()
         app.buttons["close-export-preview"].tap()
         XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
 
         // Full backup requires reading the privacy warning first.
-        app.buttons["backup-export-button"].tap()
+        // The Share list lazily realizes sections below the new printable/PDF
+        // cards; swipe until the backup button is realized and hittable.
+        let backupButton = app.buttons["backup-export-button"]
+        for _ in 0..<6 where !backupButton.isHittable {
+            let lists = app.collectionViews
+            if lists.count > 0 {
+                lists.element(boundBy: lists.count - 1).swipeUp()
+            }
+        }
+        XCTAssertTrue(backupButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(backupButton.isHittable, "Backup export must remain reachable after PDF controls")
+        backupButton.tap()
         let privacy = app.staticTexts["backup-privacy-warning"]
         XCTAssertTrue(privacy.waitForExistence(timeout: 5))
         XCTAssertTrue(privacy.label.contains("preferences"),
@@ -100,6 +124,10 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
         // summaries. Restoring is exercised at the store layer; here the
         // journey proves preview + discard never mutates the event list.
         let recoveryBrowse = app.buttons["recovery-browse-button"]
+        for _ in 0..<6 where !recoveryBrowse.isHittable {
+            let lists = app.collectionViews
+            if lists.count > 0 { lists.element(boundBy: lists.count - 1).swipeUp() }
+        }
         XCTAssertTrue(recoveryBrowse.waitForExistence(timeout: 5))
         recoveryBrowse.tap()
         XCTAssertTrue(app.navigationBars["Recovery points"].waitForExistence(timeout: 5))
@@ -169,6 +197,29 @@ final class SeatWeaveShareJourneyTests: XCTestCase {
             lists.element(boundBy: lists.count - 1).swipeUp()
         }
         XCTAssertTrue(button.waitForExistence(timeout: 5), "\(identifier) must be reachable")
+    }
+
+    @MainActor
+    private func chooseExportOption(_ app: XCUIApplication, picker identifier: String, option label: String) {
+        let trigger = app.buttons[identifier]
+        XCTAssertTrue(trigger.waitForExistence(timeout: 5), "Missing picker button \(identifier)")
+        trigger.tap()
+        let menuOption = app.buttons[label]
+        if menuOption.waitForExistence(timeout: 2) {
+            menuOption.tap()
+            return
+        }
+        let fallback = app.menuItems[label]
+        if fallback.waitForExistence(timeout: 2) {
+            fallback.tap()
+            return
+        }
+        let sheetOption = app.sheets.buttons[label]
+        if sheetOption.waitForExistence(timeout: 2) {
+            sheetOption.tap()
+            return
+        }
+        XCTFail("Failed to select option \(label) from picker \(identifier)")
     }
 
     @MainActor
