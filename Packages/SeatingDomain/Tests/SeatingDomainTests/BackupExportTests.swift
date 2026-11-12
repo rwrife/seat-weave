@@ -302,6 +302,24 @@ struct BackupExportTests {
         }
     }
 
+    @Test("Unknown backup version gives upgrade guidance even when event schema changed")
+    func futureSchemaVersionRejectedBeforeEventDecoding() throws {
+        let data = Data(#"{"version":99,"event":{"futureOnly":true}}"#.utf8)
+        #expect(throws: SeatingBackup.ImportError.unsupportedVersion(found: 99)) {
+            try SeatingBackup.decodeBackup(data)
+        }
+        // Missing version is malformed input, never silently treated as v1.
+        do {
+            _ = try SeatingBackup.decodeBackup(Data(#"{"event":{}}"#.utf8))
+            Issue.record("Missing version was accepted")
+        } catch let error as SeatingBackup.ImportError {
+            guard case .undecodable = error else {
+                Issue.record("Expected undecodable, got \(error)")
+                return
+            }
+        }
+    }
+
     @Test("Duplicate preference identity and double-seated guest are rejected before remapping")
     func duplicateIdentityAndSeatRejected() throws {
         let event = makeEvent()

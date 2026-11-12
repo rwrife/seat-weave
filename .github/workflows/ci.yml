@@ -15,9 +15,7 @@ concurrency:
 jobs:
   ios:
     runs-on: macos-15
-    # Compact, large-text and regular-width suites each run on real simulators.
-    # Run 39743069450 attempt 3 reached regular-width compilation at minute 36
-    # after both earlier suites passed, then hit the 38-minute step limit.
+    # Prior-build SwiftData fixture and compact, large-text and regular-width simulator suites.
     timeout-minutes: 60
     env:
       TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -26,7 +24,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 1
+          # Historical SwiftData fixture reads pinned pre-recovery sources from git history.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Run pinned simulator validation

@@ -115,14 +115,18 @@ public enum SeatingBackup {
         decoder.dateDecodingStrategy = .iso8601
         let document: Document
         do {
+            // ponytail: v1 is the only shipped schema; inspect the envelope first
+            // so a future version with an incompatible event still gets useful guidance.
+            struct VersionProbe: Decodable { let version: Int }
+            let version = try decoder.decode(VersionProbe.self, from: data).version
+            guard version == currentVersion else {
+                throw ImportError.unsupportedVersion(found: version)
+            }
             document = try decoder.decode(Document.self, from: data)
         } catch let error as ImportError {
             throw error
         } catch {
             throw ImportError.undecodable(underlying: String(describing: error))
-        }
-        guard document.version == currentVersion else {
-            throw ImportError.unsupportedVersion(found: document.version)
         }
         let source = document.event
         try validate(source)
